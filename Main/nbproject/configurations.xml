@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="62">
+  <logicalFolder name="root" displayName="root" projectFiles="true">
+    <df name="Main" root=".">
+      <df name=".dep">
+      </df>
+      <in>MP3Dev.h</in>
+      <in>main.c</in>
+      <in>setup.h</in>
+      <in>system_settings.h</in>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false">
+      <itemPath>../lib/LCD_driver.c</itemPath>
+      <itemPath>../lib/LCD_driver.h</itemPath>
+      <itemPath>../lib/LPC214x.h</itemPath>
+      <itemPath>../lib/LPC21xx.h</itemPath>
+      <itemPath>../lib/MMA7260.c</itemPath>
+      <itemPath>../lib/MMA7260.h</itemPath>
+      <itemPath>Makefile</itemPath>
+      <itemPath>Makefile-Main.mk</itemPath>
+      <itemPath>../lib/NS73.c</itemPath>
+      <itemPath>../lib/NS73.h</itemPath>
+      <itemPath>../lib/NokiaLCD_Original.c</itemPath>
+      <itemPath>../lib/NokiaLCD_Phillips.c</itemPath>
+      <itemPath>../lib/NokiaLCD_Phillips.h</itemPath>
+      <itemPath>../lib/fat16.c</itemPath>
+      <itemPath>../lib/fat16.h</itemPath>
+      <itemPath>../lib/fat16_config.h</itemPath>
+      <itemPath>../lib/firmware.c</itemPath>
+      <itemPath>../lib/firmware.h</itemPath>
+      <itemPath>../lib/firmware.lst</itemPath>
+      <itemPath>../lib/firmware.o</itemPath>
+      <itemPath>../lib/iap_flash.c</itemPath>
+      <itemPath>../lib/iap_flash.h</itemPath>
+      <itemPath>../lib/irq.c</itemPath>
+      <itemPath>../lib/irq.h</itemPath>
+      <itemPath>../lib/partition.c</itemPath>
+      <itemPath>../lib/partition.h</itemPath>
+      <itemPath>../lib/rootdir.c</itemPath>
+      <itemPath>../lib/rootdir.h</itemPath>
+      <itemPath>../lib/rprintf.c</itemPath>
+      <itemPath>../lib/rprintf.h</itemPath>
+      <itemPath>../lib/sd_raw.c</itemPath>
+      <itemPath>../lib/sd_raw.h</itemPath>
+      <itemPath>../lib/sd_raw_config.h</itemPath>
+      <itemPath>../lib/serial.c</itemPath>
+      <itemPath>../lib/serial.h</itemPath>
+      <itemPath>../lib/spi0.c</itemPath>
+      <itemPath>../lib/spi0.h</itemPath>
+      <itemPath>../lib/spi1.c</itemPath>
+      <itemPath>../lib/spi1.h</itemPath>
+      <itemPath>../lib/syscalls.c</itemPath>
+      <itemPath>../lib/target.h</itemPath>
+      <itemPath>../lib/type.h</itemPath>
+      <itemPath>../lib/uart.c</itemPath>
+      <itemPath>../lib/uart.h</itemPath>
+      <itemPath>../lib/vs1002.c</itemPath>
+      <itemPath>../lib/vs1002.h</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile-Main.mk</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <developmentServer>localhost</developmentServer>
+        <compilerSet>GNU|GNU</compilerSet>
+        <platform>2</platform>
+      </toolsSet>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>.</buildCommandWorkingDir>
+          <buildCommand>$(MAKE) -f Makefile</buildCommand>
+          <cleanCommand>$(MAKE) -f Makefile clean</cleanCommand>
+          <executablePath></executablePath>
+        </makeTool>
+      </makefileType>
+    </conf>
+  </confs>
+</configurationDescriptor>

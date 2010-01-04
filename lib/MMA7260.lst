@@ -1,0 +1,310 @@
+   1              		.file	"MMA7260.c"
+   9              	.Ltext0:
+  10              		.align	2
+  12              	get_adc_1:
+  13              	.LFB5:
+  14              		.file 1 "../lib/MMA7260.c"
+   1:../lib/MMA7260.c **** /* *********************************************************
+   2:../lib/MMA7260.c **** 	MMA7260 Accelerometer Library. 
+   3:../lib/MMA7260.c **** 	Must include the MMA7260.h header file.  
+   4:../lib/MMA7260.c **** 	X_CHANNEL, Y_CHANNEL, and Z_CHANNEL must be defined
+   5:../lib/MMA7260.c **** 	in an external header file that is included
+   6:../lib/MMA7260.c **** 	
+   7:../lib/MMA7260.c **** 	Library contains the following functions:
+   8:../lib/MMA7260.c **** 	
+   9:../lib/MMA7260.c **** 	int MMA_get_x(void);
+  10:../lib/MMA7260.c **** 	int MMA_get_y(void);
+  11:../lib/MMA7260.c **** 	int MMA_get_z(void);
+  12:../lib/MMA7260.c **** 	void MMA_change_mode(char mode);
+  13:../lib/MMA7260.c **** 	
+  14:../lib/MMA7260.c **** 	Written by Ryan Owens - 2/1/2008
+  15:../lib/MMA7260.c ****   ********************************************************* */
+  16:../lib/MMA7260.c **** 
+  17:../lib/MMA7260.c **** //********************************************************************
+  18:../lib/MMA7260.c **** //
+  19:../lib/MMA7260.c **** //                  Header files
+  20:../lib/MMA7260.c **** //
+  21:../lib/MMA7260.c **** //********************************************************************
+  22:../lib/MMA7260.c **** #include "MMA7260.h"
+  23:../lib/MMA7260.c **** #include "LPC214x.h"
+  24:../lib/MMA7260.c **** #include "MP3Dev.h"
+  25:../lib/MMA7260.c **** 
+  26:../lib/MMA7260.c **** //********************************************************************
+  27:../lib/MMA7260.c **** //
+  28:../lib/MMA7260.c **** //				"Private" Function Definitions
+  29:../lib/MMA7260.c **** //
+  30:../lib/MMA7260.c **** //********************************************************************
+  31:../lib/MMA7260.c **** static int get_adc_1(int channel);
+  32:../lib/MMA7260.c **** 
+  33:../lib/MMA7260.c **** 
+  34:../lib/MMA7260.c **** /**********************************************************
+  35:../lib/MMA7260.c ****                        Functions
+  36:../lib/MMA7260.c **** **********************************************************/
+  37:../lib/MMA7260.c **** 
+  38:../lib/MMA7260.c **** //Usage: x_accel = MMA_get_x();
+  39:../lib/MMA7260.c **** //Inputs: None
+  40:../lib/MMA7260.c **** //Outputs: None
+  41:../lib/MMA7260.c **** //Description: Returns an integer value corresponding to the acceleration
+  42:../lib/MMA7260.c **** //             of the x-axis of the MMA7260 accelerometer.
+  43:../lib/MMA7260.c **** int MMA_get_x(void)
+  44:../lib/MMA7260.c **** {
+  45:../lib/MMA7260.c ****     int value;
+  46:../lib/MMA7260.c ****     value = get_adc_1(X_CHANNEL);
+  47:../lib/MMA7260.c ****     return value;
+  48:../lib/MMA7260.c **** }
+  49:../lib/MMA7260.c **** 
+  50:../lib/MMA7260.c **** //Usage: y_accel = MMA_get_y();
+  51:../lib/MMA7260.c **** //Inputs: None
+  52:../lib/MMA7260.c **** //Outputs: None
+  53:../lib/MMA7260.c **** //Description: Returns an integer value corresponding to the acceleration
+  54:../lib/MMA7260.c **** //             of the y-axis of the MMA7260 accelerometer.
+  55:../lib/MMA7260.c **** int MMA_get_y(void)
+  56:../lib/MMA7260.c **** {
+  57:../lib/MMA7260.c ****     int value;
+  58:../lib/MMA7260.c ****     value = get_adc_1(Y_CHANNEL);
+  59:../lib/MMA7260.c ****     return value;
+  60:../lib/MMA7260.c **** }
+  61:../lib/MMA7260.c **** 
+  62:../lib/MMA7260.c **** //Usage: z_accel = MMA_get_z();
+  63:../lib/MMA7260.c **** //Inputs: None
+  64:../lib/MMA7260.c **** //Outputs: None
+  65:../lib/MMA7260.c **** //Description: Returns an integer value corresponding to the acceleration
+  66:../lib/MMA7260.c **** //             of the z-axis of the MMA7260 accelerometer.
+  67:../lib/MMA7260.c **** int MMA_get_z(void)
+  68:../lib/MMA7260.c **** {
+  69:../lib/MMA7260.c ****     int value;
+  70:../lib/MMA7260.c ****     value = get_adc_1(Z_CHANNEL);
+  71:../lib/MMA7260.c ****     return value;
+  72:../lib/MMA7260.c **** }
+  73:../lib/MMA7260.c **** 
+  74:../lib/MMA7260.c **** //Usage: accel = get_adc_1(X_CHANNEL);
+  75:../lib/MMA7260.c **** //Inputs: int channel - integer corresponding to the ADC channel to be converted
+  76:../lib/MMA7260.c **** //Outputs: None
+  77:../lib/MMA7260.c **** //Description: Returns the raw analog to digital conversion of the input channel.  
+  78:../lib/MMA7260.c **** //**NOTE** Because this function is static, it is essentially a "private" function
+  79:../lib/MMA7260.c **** //         and can only be used within this file!
+  80:../lib/MMA7260.c **** static int get_adc_1(int channel)
+  81:../lib/MMA7260.c **** {
+  15              		.loc 1 81 0
+  16              		@ Function supports interworking.
+  17              		@ args = 0, pretend = 0, frame = 0
+  18              		@ frame_needed = 0, uses_anonymous_args = 0
+  19              		@ link register save eliminated.
+  20              	.LVL0:
+  82:../lib/MMA7260.c ****     int val;
+  83:../lib/MMA7260.c ****     AD1CR = 0;
+  21              		.loc 1 83 0
+  22 0000 44209FE5 		ldr	r2, .L7
+  84:../lib/MMA7260.c ****     AD1GDR = 0;
+  23              		.loc 1 84 0
+  24 0004 44309FE5 		ldr	r3, .L7+4
+  85:../lib/MMA7260.c **** 
+  86:../lib/MMA7260.c ****     AD1CR = 0x00200600 | channel;
+  25              		.loc 1 86 0
+  26 0008 020680E3 		orr	r0, r0, #2097152
+  27              	.LVL1:
+  28              		.loc 1 83 0
+  29 000c 0010A0E3 		mov	r1, #0
+  30              		.loc 1 86 0
+  31 0010 060C80E3 		orr	r0, r0, #1536
+  32              		.loc 1 83 0
+  33 0014 001082E5 		str	r1, [r2, #0]
+  34              		.loc 1 84 0
+  35 0018 001083E5 		str	r1, [r3, #0]
+  36              		.loc 1 86 0
+  37 001c 000082E5 		str	r0, [r2, #0]
+  87:../lib/MMA7260.c ****     AD1CR |= 0x01000000;
+  38              		.loc 1 87 0
+  39 0020 003092E5 		ldr	r3, [r2, #0]
+  40 0024 013483E3 		orr	r3, r3, #16777216
+  41 0028 003082E5 		str	r3, [r2, #0]
+  42              		.loc 1 81 0
+  43              		@ lr needed for prologue
+  44              	.L2:
+  88:../lib/MMA7260.c ****     do
+  89:../lib/MMA7260.c ****     {
+  90:../lib/MMA7260.c ****         val = AD1GDR;                   // Read A/D Data Register
+  45              		.loc 1 90 0
+  46 002c 1C309FE5 		ldr	r3, .L7+4
+  47 0030 000093E5 		ldr	r0, [r3, #0]
+  91:../lib/MMA7260.c ****     }
+  92:../lib/MMA7260.c ****     while ((val & 0x80000000) == 0);  //Wait for the conversion to complete
+  48              		.loc 1 92 0
+  49 0034 000050E3 		cmp	r0, #0
+  50 0038 090000AA 		bge	.L2
+  51 003c 4003A0E1 		mov	r0, r0, asr #6
+  93:../lib/MMA7260.c ****     val = ((val >> 6) & 0x03FF);  //Extract the A/D result
+  94:../lib/MMA7260.c **** 
+  95:../lib/MMA7260.c ****     return val;
+  96:../lib/MMA7260.c **** }
+  52              		.loc 1 96 0
+  53 0040 000BA0E1 		mov	r0, r0, asl #22
+  54 0044 200BA0E1 		mov	r0, r0, lsr #22
+  55 0048 1EFF2FE1 		bx	lr
+  56              	.L8:
+  57              		.align	2
+  58              	.L7:
+  59 004c 000006E0 		.word	-536477696
+  60 0050 040006E0 		.word	-536477692
+  61              	.LFE5:
+  63              		.align	2
+  64              		.global	MMA_get_x
+  66              	MMA_get_x:
+  67              	.LFB2:
+  68              		.loc 1 44 0
+  69              		@ Function supports interworking.
+  70              		@ args = 0, pretend = 0, frame = 0
+  71              		@ frame_needed = 0, uses_anonymous_args = 0
+  72              		@ link register save eliminated.
+  73              	.LVL2:
+  74              		.loc 1 46 0
+  75 0054 0800A0E3 		mov	r0, #8
+  76              		.loc 1 44 0
+  77              		@ lr needed for prologue
+  78              		.loc 1 48 0
+  79              		.loc 1 46 0
+  80 0058 FEFFFFEA 		b	get_adc_1
+  81              	.LFE2:
+  83              		.align	2
+  84              		.global	MMA_get_y
+  86              	MMA_get_y:
+  87              	.LFB3:
+  88              		.loc 1 56 0
+  89              		@ Function supports interworking.
+  90              		@ args = 0, pretend = 0, frame = 0
+  91              		@ frame_needed = 0, uses_anonymous_args = 0
+  92              		@ link register save eliminated.
+  93              	.LVL3:
+  94              		.loc 1 58 0
+  95 005c 1000A0E3 		mov	r0, #16
+  96              		.loc 1 56 0
+  97              		@ lr needed for prologue
+  98              		.loc 1 60 0
+  99              		.loc 1 58 0
+ 100 0060 FEFFFFEA 		b	get_adc_1
+ 101              	.LFE3:
+ 103              		.align	2
+ 104              		.global	MMA_get_z
+ 106              	MMA_get_z:
+ 107              	.LFB4:
+ 108              		.loc 1 68 0
+ 109              		@ Function supports interworking.
+ 110              		@ args = 0, pretend = 0, frame = 0
+ 111              		@ frame_needed = 0, uses_anonymous_args = 0
+ 112              		@ link register save eliminated.
+ 113              	.LVL4:
+ 114              		.loc 1 70 0
+ 115 0064 2000A0E3 		mov	r0, #32
+ 116              		.loc 1 68 0
+ 117              		@ lr needed for prologue
+ 118              		.loc 1 72 0
+ 119              		.loc 1 70 0
+ 120 0068 FEFFFFEA 		b	get_adc_1
+ 121              	.LFE4:
+ 123              		.align	2
+ 124              		.global	MMA_change_mode
+ 126              	MMA_change_mode:
+ 127              	.LFB6:
+  97:../lib/MMA7260.c **** 
+  98:../lib/MMA7260.c **** //Usage: MMA_change_mode(RANGE_2G);
+  99:../lib/MMA7260.c **** //Inputs: char mode - The mode to be set (Modes are defined in MMA7260.h)
+ 100:../lib/MMA7260.c **** //Outputs: None
+ 101:../lib/MMA7260.c **** //Description: Sets the sensitivity of the MMA7260 accelerometer based on
+ 102:../lib/MMA7260.c **** //             the input "mode" value.
+ 103:../lib/MMA7260.c **** void MMA_change_mode(char mode){
+ 128              		.loc 1 103 0
+ 129              		@ Function supports interworking.
+ 130              		@ args = 0, pretend = 0, frame = 0
+ 131              		@ frame_needed = 0, uses_anonymous_args = 0
+ 132              		@ link register save eliminated.
+ 133              	.LVL5:
+ 104:../lib/MMA7260.c **** 
+ 105:../lib/MMA7260.c ****     /*
+ 106:../lib/MMA7260.c **** 	Setup the MMA g-select
+ 107:../lib/MMA7260.c **** 	GS1/GS2
+ 108:../lib/MMA7260.c **** 	0/0 = 1.5g
+ 109:../lib/MMA7260.c **** 	1/0 = 2g
+ 110:../lib/MMA7260.c **** 	0/1 = 4g
+ 111:../lib/MMA7260.c **** 	1/1 = 6g
+ 112:../lib/MMA7260.c **** 	*/
+ 113:../lib/MMA7260.c **** 	IODIR0|=(GS1 | GS2);
+ 134              		.loc 1 113 0
+ 135 006c 74209FE5 		ldr	r2, .L26
+ 136 0070 003092E5 		ldr	r3, [r2, #0]
+ 137              		.loc 1 103 0
+ 138 0074 FF0000E2 		and	r0, r0, #255
+ 139              		.loc 1 113 0
+ 140 0078 033B83E3 		orr	r3, r3, #3072
+ 114:../lib/MMA7260.c **** 	if(mode==RANGE_15G)	IOCLR0=(GS1 | GS2);
+ 141              		.loc 1 114 0
+ 142 007c 310050E3 		cmp	r0, #49
+ 143              		.loc 1 113 0
+ 144 0080 003082E5 		str	r3, [r2, #0]
+ 145              		.loc 1 103 0
+ 146              		@ lr needed for prologue
+ 147              		.loc 1 114 0
+ 148 0084 032BA003 		moveq	r2, #3072
+ 149 0088 5C309F05 		ldreq	r3, .L26+4
+ 150 008c 3600000A 		beq	.L25
+ 115:../lib/MMA7260.c **** 	else if(mode==RANGE_2G){
+ 151              		.loc 1 115 0
+ 152 0090 320050E3 		cmp	r0, #50
+ 153 0094 2A00001A 		bne	.L19
+ 116:../lib/MMA7260.c **** 		IOSET0=GS1;
+ 154              		.loc 1 116 0
+ 155 0098 50309FE5 		ldr	r3, .L26+8
+ 156 009c 022BA0E3 		mov	r2, #2048
+ 157 00a0 002083E5 		str	r2, [r3, #0]
+ 117:../lib/MMA7260.c **** 		IOCLR0=GS2;
+ 158              		.loc 1 117 0
+ 159 00a4 012B42E2 		sub	r2, r2, #1024
+ 160 00a8 083083E2 		add	r3, r3, #8
+ 161 00ac 360000EA 		b	.L25
+ 162              	.L19:
+ 118:../lib/MMA7260.c **** 	}
+ 119:../lib/MMA7260.c **** 	else if(mode==RANGE_4G){
+ 163              		.loc 1 119 0
+ 164 00b0 330050E3 		cmp	r0, #51
+ 165 00b4 3200001A 		bne	.L21
+ 120:../lib/MMA7260.c **** 		IOCLR0=GS1;
+ 166              		.loc 1 120 0
+ 167 00b8 2C309FE5 		ldr	r3, .L26+4
+ 168 00bc 022BA0E3 		mov	r2, #2048
+ 169 00c0 002083E5 		str	r2, [r3, #0]
+ 121:../lib/MMA7260.c **** 		IOSET0=GS2;
+ 170              		.loc 1 121 0
+ 171 00c4 012B42E2 		sub	r2, r2, #1024
+ 172 00c8 083043E2 		sub	r3, r3, #8
+ 173 00cc 360000EA 		b	.L25
+ 174              	.L21:
+ 122:../lib/MMA7260.c **** 	}
+ 123:../lib/MMA7260.c **** 	else if(mode==RANGE_6G)IOSET0=(GS1 | GS2);
+ 175              		.loc 1 123 0
+ 176 00d0 340050E3 		cmp	r0, #52
+ 177 00d4 1EFF2F11 		bxne	lr
+ 178 00d8 10309FE5 		ldr	r3, .L26+8
+ 179 00dc 032BA0E3 		mov	r2, #3072
+ 180              	.L25:
+ 181 00e0 002083E5 		str	r2, [r3, #0]
+ 182 00e4 1EFF2FE1 		bx	lr
+ 183              	.L27:
+ 184              		.align	2
+ 185              	.L26:
+ 186 00e8 088002E0 		.word	-536707064
+ 187 00ec 0C8002E0 		.word	-536707060
+ 188 00f0 048002E0 		.word	-536707068
+ 189              	.LFE6:
+ 247              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 MMA7260.c
+     /tmp/ccDTRa4H.s:12     .text:0000000000000000 get_adc_1
+     /tmp/ccDTRa4H.s:22     .text:0000000000000000 $a
+     /tmp/ccDTRa4H.s:59     .text:000000000000004c $d
+     /tmp/ccDTRa4H.s:66     .text:0000000000000054 MMA_get_x
+     /tmp/ccDTRa4H.s:75     .text:0000000000000054 $a
+     /tmp/ccDTRa4H.s:86     .text:000000000000005c MMA_get_y
+     /tmp/ccDTRa4H.s:106    .text:0000000000000064 MMA_get_z
+     /tmp/ccDTRa4H.s:126    .text:000000000000006c MMA_change_mode
+     /tmp/ccDTRa4H.s:186    .text:00000000000000e8 $d
+
+NO UNDEFINED SYMBOLS

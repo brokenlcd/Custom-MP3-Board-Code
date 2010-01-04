@@ -1,0 +1,121 @@
+   1              		.file	"spi0.c"
+   9              	.Ltext0:
+  10              		.align	2
+  11              		.global	SPI0_send_recv
+  13              	SPI0_send_recv:
+  14              	.LFB4:
+  15              		.file 1 "../lib/spi0.c"
+   1:../lib/spi0.c **** /*
+   2:../lib/spi0.c ****     SPI Communication for LPC2148 SPI0.
+   3:../lib/spi0.c **** 	2/1/2008
+   4:../lib/spi0.c **** 	Ryan Owens
+   5:../lib/spi0.c **** 
+   6:../lib/spi0.c **** 
+   7:../lib/spi0.c **** */
+   8:../lib/spi0.c **** 
+   9:../lib/spi0.c **** #include "spi0.h"
+  10:../lib/spi0.c **** #include "LPC214x.h"
+  11:../lib/spi0.c **** #include <stdio.h>
+  12:../lib/spi0.c **** 
+  13:../lib/spi0.c **** void SPI0_send(char c)
+  14:../lib/spi0.c **** {
+  15:../lib/spi0.c ****     SPI0_send_recv(c);
+  16:../lib/spi0.c **** }
+  17:../lib/spi0.c **** 
+  18:../lib/spi0.c **** char SPI0_recv(void)
+  19:../lib/spi0.c **** {
+  20:../lib/spi0.c ****     return SPI0_send_recv(0xff);
+  21:../lib/spi0.c **** }
+  22:../lib/spi0.c **** 
+  23:../lib/spi0.c **** char SPI0_send_recv(char c)
+  24:../lib/spi0.c **** {
+  16              		.loc 1 24 0
+  17              		@ Function supports interworking.
+  18              		@ args = 0, pretend = 0, frame = 0
+  19              		@ frame_needed = 0, uses_anonymous_args = 0
+  20              		@ link register save eliminated.
+  21              	.LVL0:
+  25:../lib/spi0.c ****     char in;
+  26:../lib/spi0.c **** 
+  27:../lib/spi0.c ****     S0SPDR = c;						//Place data to be sent into SPI data register
+  22              		.loc 1 27 0
+  23 0000 28309FE5 		ldr	r3, .L7
+  24              		.loc 1 24 0
+  25 0004 FF0000E2 		and	r0, r0, #255
+  26              		.loc 1 27 0
+  27 0008 000083E5 		str	r0, [r3, #0]
+  28              		.loc 1 24 0
+  29              		@ lr needed for prologue
+  30              	.L2:
+  28:../lib/spi0.c ****     while(!(S0SPSR & SPIF));		//Wait for transfer to complete
+  31              		.loc 1 28 0
+  32 000c 20209FE5 		ldr	r2, .L7+4
+  33 0010 003092E5 		ldr	r3, [r2, #0]
+  34 0014 800013E3 		tst	r3, #128
+  35 0018 0100000A 		beq	.L2
+  29:../lib/spi0.c **** 	in=S0SPSR;
+  36              		.loc 1 29 0
+  37 001c 003092E5 		ldr	r3, [r2, #0]
+  30:../lib/spi0.c ****     in = S0SPDR&0xff;				//Return the character placed in the SPI data register by the slave
+  38              		.loc 1 30 0
+  39 0020 08309FE5 		ldr	r3, .L7
+  40 0024 000093E5 		ldr	r0, [r3, #0]
+  41              	.LVL1:
+  42 0028 FF0000E2 		and	r0, r0, #255
+  31:../lib/spi0.c ****     
+  32:../lib/spi0.c **** 	return in;
+  33:../lib/spi0.c **** }
+  43              		.loc 1 33 0
+  44 002c 1EFF2FE1 		bx	lr
+  45              	.L8:
+  46              		.align	2
+  47              	.L7:
+  48 0030 080002E0 		.word	-536739832
+  49 0034 040002E0 		.word	-536739836
+  50              	.LFE4:
+  52              		.align	2
+  53              		.global	SPI0_send
+  55              	SPI0_send:
+  56              	.LFB2:
+  57              		.loc 1 14 0
+  58              		@ Function supports interworking.
+  59              		@ args = 0, pretend = 0, frame = 0
+  60              		@ frame_needed = 0, uses_anonymous_args = 0
+  61              		@ link register save eliminated.
+  62              	.LVL2:
+  63 0038 FF0000E2 		and	r0, r0, #255
+  64              		@ lr needed for prologue
+  65              		.loc 1 16 0
+  66              		.loc 1 15 0
+  67 003c FEFFFFEA 		b	SPI0_send_recv
+  68              	.LVL3:
+  69              	.LFE2:
+  71              		.align	2
+  72              		.global	SPI0_recv
+  74              	SPI0_recv:
+  75              	.LFB3:
+  76              		.loc 1 19 0
+  77              		@ Function supports interworking.
+  78              		@ args = 0, pretend = 0, frame = 0
+  79              		@ frame_needed = 0, uses_anonymous_args = 0
+  80              	.LVL4:
+  81 0040 04E02DE5 		str	lr, [sp, #-4]!
+  82              	.LCFI0:
+  83              		.loc 1 20 0
+  84 0044 FF00A0E3 		mov	r0, #255
+  85 0048 FEFFFFEB 		bl	SPI0_send_recv
+  86              		.loc 1 21 0
+  87 004c 04E09DE4 		ldr	lr, [sp], #4
+  88 0050 1EFF2FE1 		bx	lr
+  89              	.LFE3:
+ 137              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 spi0.c
+     /tmp/ccUgv5EX.s:13     .text:0000000000000000 SPI0_send_recv
+     /tmp/ccUgv5EX.s:23     .text:0000000000000000 $a
+     /tmp/ccUgv5EX.s:48     .text:0000000000000030 $d
+     /tmp/ccUgv5EX.s:55     .text:0000000000000038 SPI0_send
+     /tmp/ccUgv5EX.s:63     .text:0000000000000038 $a
+     /tmp/ccUgv5EX.s:74     .text:0000000000000040 SPI0_recv
+
+NO UNDEFINED SYMBOLS

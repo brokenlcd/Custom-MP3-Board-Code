@@ -1,0 +1,325 @@
+   1              		.file	"serial.c"
+   9              	.Ltext0:
+  10              		.global	__udivsi3
+  11              		.align	2
+  12              		.global	init_serial0
+  14              	init_serial0:
+  15              	.LFB2:
+  16              		.file 1 "../lib/serial.c"
+   1:../lib/serial.c **** /******************************************************************************/
+   2:../lib/serial.c **** /*  This file is part of the uVision/ARM development tools                    */
+   3:../lib/serial.c **** /*  Copyright KEIL ELEKTRONIK GmbH 2002-2004                                  */
+   4:../lib/serial.c **** /******************************************************************************/
+   5:../lib/serial.c **** /*                                                                            */
+   6:../lib/serial.c **** /*  SERIAL.C:  Low Level Serial Routines                                      */
+   7:../lib/serial.c **** /*  modified and extended by Martin Thomas                                    */
+   8:../lib/serial.c **** /*                                                                            */
+   9:../lib/serial.c **** /******************************************************************************/
+  10:../lib/serial.c **** 
+  11:../lib/serial.c **** #include "LPC214x.h"
+  12:../lib/serial.c **** #include "target.h"
+  13:../lib/serial.c **** #include "serial.h"
+  14:../lib/serial.c **** 
+  15:../lib/serial.c **** #define CR     0x0D
+  16:../lib/serial.c **** 
+  17:../lib/serial.c **** /* Initialize Serial Interface UART0 */
+  18:../lib/serial.c **** void init_serial0 ( unsigned long baudrate )
+  19:../lib/serial.c **** {
+  17              		.loc 1 19 0
+  18              		@ Function supports interworking.
+  19              		@ args = 0, pretend = 0, frame = 0
+  20              		@ frame_needed = 0, uses_anonymous_args = 0
+  21              	.LVL0:
+  20:../lib/serial.c ****     unsigned long Fdiv;
+  21:../lib/serial.c **** 
+  22:../lib/serial.c ****     PINSEL0 = 0x00000005;                  /* Enable RxD0 and TxD0              */
+  22              		.loc 1 22 0
+  23 0000 44309FE5 		ldr	r3, .L3
+  24              		.loc 1 19 0
+  25 0004 10402DE9 		stmfd	sp!, {r4, lr}
+  26              	.LCFI0:
+  27              		.loc 1 22 0
+  28 0008 0520A0E3 		mov	r2, #5
+  23:../lib/serial.c ****     U0LCR = 0x83;                          /* 8 bits, no Parity, 1 Stop bit     */
+  29              		.loc 1 23 0
+  30 000c 3C409FE5 		ldr	r4, .L3+4
+  31              		.loc 1 22 0
+  32 0010 002083E5 		str	r2, [r3, #0]
+  33              		.loc 1 23 0
+  34 0014 8330A0E3 		mov	r3, #131
+  35              		.loc 1 19 0
+  36 0018 0010A0E1 		mov	r1, r0
+  37              		.loc 1 23 0
+  38 001c 003084E5 		str	r3, [r4, #0]
+  24:../lib/serial.c ****     Fdiv = ( Fpclk / 16 ) / baudrate ;     /* baud rate                        */
+  39              		.loc 1 24 0
+  40 0020 2C009FE5 		ldr	r0, .L3+8
+  41              	.LVL1:
+  42 0024 FEFFFFEB 		bl	__udivsi3
+  43              	.LVL2:
+  25:../lib/serial.c ****     U0DLM = Fdiv / 256;
+  44              		.loc 1 25 0
+  45 0028 28309FE5 		ldr	r3, .L3+12
+  26:../lib/serial.c ****     U0DLL = Fdiv % 256;
+  46              		.loc 1 26 0
+  47 002c FF2000E2 		and	r2, r0, #255
+  48              		.loc 1 25 0
+  49 0030 2004A0E1 		mov	r0, r0, lsr #8
+  50 0034 040003E4 		str	r0, [r3], #-4
+  51              		.loc 1 26 0
+  52 0038 002083E5 		str	r2, [r3, #0]
+  27:../lib/serial.c ****     U0LCR = 0x03;                           /* DLAB = 0                         */
+  53              		.loc 1 27 0
+  54 003c 0330A0E3 		mov	r3, #3
+  55 0040 003084E5 		str	r3, [r4, #0]
+  28:../lib/serial.c **** }
+  56              		.loc 1 28 0
+  57 0044 1040BDE8 		ldmfd	sp!, {r4, lr}
+  58 0048 1EFF2FE1 		bx	lr
+  59              	.L4:
+  60              		.align	2
+  61              	.L3:
+  62 004c 00C002E0 		.word	-536690688
+  63 0050 0CC000E0 		.word	-536821748
+  64 0054 1C4E0E00 		.word	937500
+  65 0058 04C000E0 		.word	-536821756
+  66              	.LFE2:
+  68              		.align	2
+  69              		.global	putchar_serial0
+  71              	putchar_serial0:
+  72              	.LFB3:
+  29:../lib/serial.c **** 
+  30:../lib/serial.c **** /* Write character to Serial Port 0 with \n -> \r\n  */
+  31:../lib/serial.c **** int putchar_serial0 (int ch)
+  32:../lib/serial.c **** {
+  73              		.loc 1 32 0
+  74              		@ Function supports interworking.
+  75              		@ args = 0, pretend = 0, frame = 0
+  76              		@ frame_needed = 0, uses_anonymous_args = 0
+  77              		@ link register save eliminated.
+  78              	.LVL3:
+  33:../lib/serial.c ****     if (ch == '\n')
+  79              		.loc 1 33 0
+  80 005c 0A0050E3 		cmp	r0, #10
+  81              		.loc 1 32 0
+  82              		@ lr needed for prologue
+  83              		.loc 1 33 0
+  84 0060 1E00001A 		bne	.L12
+  85              	.L11:
+  34:../lib/serial.c ****     {
+  35:../lib/serial.c ****         while (!(U0LSR & 0x20));
+  86              		.loc 1 35 0
+  87 0064 34309FE5 		ldr	r3, .L17
+  88 0068 003093E5 		ldr	r3, [r3, #0]
+  89 006c 200013E3 		tst	r3, #32
+  90 0070 1700000A 		beq	.L11
+  36:../lib/serial.c ****         U0THR = CR;                  /* output CR */
+  91              		.loc 1 36 0
+  92 0074 28309FE5 		ldr	r3, .L17+4
+  93 0078 0D20A0E3 		mov	r2, #13
+  94 007c 002083E5 		str	r2, [r3, #0]
+  95              	.L12:
+  37:../lib/serial.c ****     }
+  38:../lib/serial.c ****     while (!(U0LSR & 0x20));
+  96              		.loc 1 38 0
+  97 0080 18309FE5 		ldr	r3, .L17
+  98 0084 003093E5 		ldr	r3, [r3, #0]
+  99 0088 200013E3 		tst	r3, #32
+ 100 008c 1E00000A 		beq	.L12
+  39:../lib/serial.c ****     return (U0THR = ch);
+ 101              		.loc 1 39 0
+ 102 0090 0C309FE5 		ldr	r3, .L17+4
+ 103 0094 000083E5 		str	r0, [r3, #0]
+ 104 0098 000093E5 		ldr	r0, [r3, #0]
+ 105              	.LVL4:
+  40:../lib/serial.c **** }
+ 106              		.loc 1 40 0
+ 107 009c 1EFF2FE1 		bx	lr
+ 108              	.L18:
+ 109              		.align	2
+ 110              	.L17:
+ 111 00a0 14C000E0 		.word	-536821740
+ 112 00a4 00C000E0 		.word	-536821760
+ 113              	.LFE3:
+ 115              		.align	2
+ 116              		.global	putc_serial0
+ 118              	putc_serial0:
+ 119              	.LFB4:
+  41:../lib/serial.c **** 
+  42:../lib/serial.c **** /* Write character to Serial Port 0 without \n -> \r\n  */
+  43:../lib/serial.c **** int putc_serial0 (int ch)
+  44:../lib/serial.c **** {
+ 120              		.loc 1 44 0
+ 121              		@ Function supports interworking.
+ 122              		@ args = 0, pretend = 0, frame = 0
+ 123              		@ frame_needed = 0, uses_anonymous_args = 0
+ 124              		@ link register save eliminated.
+ 125              	.LVL5:
+ 126              		@ lr needed for prologue
+ 127              	.L21:
+  45:../lib/serial.c ****     while (!(U0LSR & 0x20));
+ 128              		.loc 1 45 0
+ 129 00a8 18309FE5 		ldr	r3, .L26
+ 130 00ac 003093E5 		ldr	r3, [r3, #0]
+ 131 00b0 200013E3 		tst	r3, #32
+ 132 00b4 2800000A 		beq	.L21
+  46:../lib/serial.c ****     return (U0THR = ch);
+ 133              		.loc 1 46 0
+ 134 00b8 0C309FE5 		ldr	r3, .L26+4
+ 135 00bc 000083E5 		str	r0, [r3, #0]
+ 136 00c0 000093E5 		ldr	r0, [r3, #0]
+ 137              	.LVL6:
+  47:../lib/serial.c **** }
+ 138              		.loc 1 47 0
+ 139 00c4 1EFF2FE1 		bx	lr
+ 140              	.L27:
+ 141              		.align	2
+ 142              	.L26:
+ 143 00c8 14C000E0 		.word	-536821740
+ 144 00cc 00C000E0 		.word	-536821760
+ 145              	.LFE4:
+ 147              		.align	2
+ 148              		.global	putstring_serial0
+ 150              	putstring_serial0:
+ 151              	.LFB5:
+  48:../lib/serial.c **** 
+  49:../lib/serial.c **** 
+  50:../lib/serial.c **** void putstring_serial0 (const char *string)
+  51:../lib/serial.c **** {
+ 152              		.loc 1 51 0
+ 153              		@ Function supports interworking.
+ 154              		@ args = 0, pretend = 0, frame = 0
+ 155              		@ frame_needed = 0, uses_anonymous_args = 0
+ 156              	.LVL7:
+ 157 00d0 10402DE9 		stmfd	sp!, {r4, lr}
+ 158              	.LCFI1:
+ 159              		.loc 1 51 0
+ 160 00d4 0040A0E1 		mov	r4, r0
+ 161 00d8 360000EA 		b	.L29
+ 162              	.LVL8:
+ 163              	.L30:
+  52:../lib/serial.c ****     char ch;
+  53:../lib/serial.c **** 
+  54:../lib/serial.c ****     while ((ch = *string))
+  55:../lib/serial.c ****     {
+  56:../lib/serial.c ****         putchar_serial0(ch);
+ 164              		.loc 1 56 0
+ 165 00dc FEFFFFEB 		bl	putchar_serial0
+ 166              	.LVL9:
+ 167              	.LVL10:
+ 168              	.L29:
+ 169              		.loc 1 54 0
+ 170 00e0 0030D4E5 		ldrb	r3, [r4, #0]	@ zero_extendqisi2
+ 171              	.LVL11:
+ 172 00e4 000053E2 		subs	r0, r3, #0
+  57:../lib/serial.c ****         string++;
+ 173              		.loc 1 57 0
+ 174 00e8 014084E2 		add	r4, r4, #1
+ 175              		.loc 1 54 0
+ 176 00ec 3500001A 		bne	.L30
+ 177              	.LVL12:
+  58:../lib/serial.c ****     }
+  59:../lib/serial.c **** }
+ 178              		.loc 1 59 0
+ 179 00f0 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 180 00f4 1EFF2FE1 		bx	lr
+ 181              	.LFE5:
+ 183              		.align	2
+ 184              		.global	getkey_serial0
+ 186              	getkey_serial0:
+ 187              	.LFB6:
+  60:../lib/serial.c **** 
+  61:../lib/serial.c **** 
+  62:../lib/serial.c **** /* Read character from Serial Port   */
+  63:../lib/serial.c **** int getkey_serial0 (void)
+  64:../lib/serial.c **** {
+ 188              		.loc 1 64 0
+ 189              		@ Function supports interworking.
+ 190              		@ args = 0, pretend = 0, frame = 0
+ 191              		@ frame_needed = 0, uses_anonymous_args = 0
+ 192              		@ link register save eliminated.
+ 193              	.LVL13:
+  65:../lib/serial.c **** 	if (U0LSR & 0x01)
+ 194              		.loc 1 65 0
+ 195 00f8 14309FE5 		ldr	r3, .L38
+ 196 00fc 003093E5 		ldr	r3, [r3, #0]
+ 197 0100 013013E2 		ands	r3, r3, #1
+ 198 0104 0300A0E1 		mov	r0, r3
+  66:../lib/serial.c ****     {
+  67:../lib/serial.c ****         return (U0RBR);
+ 199              		.loc 1 67 0
+ 200 0108 08309F15 		ldrne	r3, .L38+4
+ 201 010c 00009315 		ldrne	r0, [r3, #0]
+ 202              		.loc 1 64 0
+ 203              		@ lr needed for prologue
+  68:../lib/serial.c ****     }
+  69:../lib/serial.c ****     else
+  70:../lib/serial.c ****     {
+  71:../lib/serial.c ****         return 0;
+  72:../lib/serial.c ****     }
+  73:../lib/serial.c **** }
+ 204              		.loc 1 73 0
+ 205 0110 1EFF2FE1 		bx	lr
+ 206              	.L39:
+ 207              		.align	2
+ 208              	.L38:
+ 209 0114 14C000E0 		.word	-536821740
+ 210 0118 00C000E0 		.word	-536821760
+ 211              	.LFE6:
+ 213              		.align	2
+ 214              		.global	getc0
+ 216              	getc0:
+ 217              	.LFB7:
+  74:../lib/serial.c **** 
+  75:../lib/serial.c **** /* Read character from Serial Port   */
+  76:../lib/serial.c **** int getc0 (void)
+  77:../lib/serial.c **** {
+ 218              		.loc 1 77 0
+ 219              		@ Function supports interworking.
+ 220              		@ args = 0, pretend = 0, frame = 0
+ 221              		@ frame_needed = 0, uses_anonymous_args = 0
+ 222              		@ link register save eliminated.
+ 223              	.LVL14:
+ 224              		@ lr needed for prologue
+ 225              	.L42:
+  78:../lib/serial.c **** 	while ( (U0LSR & 0x01) == 0 ); //Wait for character
+ 226              		.loc 1 78 0
+ 227 011c 14309FE5 		ldr	r3, .L47
+ 228 0120 003093E5 		ldr	r3, [r3, #0]
+ 229 0124 010013E3 		tst	r3, #1
+ 230 0128 4500000A 		beq	.L42
+  79:../lib/serial.c **** 	return U0RBR;
+ 231              		.loc 1 79 0
+ 232 012c 08309FE5 		ldr	r3, .L47+4
+ 233 0130 000093E5 		ldr	r0, [r3, #0]
+  80:../lib/serial.c **** }
+ 234              		.loc 1 80 0
+ 235 0134 1EFF2FE1 		bx	lr
+ 236              	.L48:
+ 237              		.align	2
+ 238              	.L47:
+ 239 0138 14C000E0 		.word	-536821740
+ 240 013c 00C000E0 		.word	-536821760
+ 241              	.LFE7:
+ 323              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 serial.c
+     /tmp/ccAH4lLW.s:14     .text:0000000000000000 init_serial0
+     /tmp/ccAH4lLW.s:23     .text:0000000000000000 $a
+     /tmp/ccAH4lLW.s:62     .text:000000000000004c $d
+     /tmp/ccAH4lLW.s:71     .text:000000000000005c putchar_serial0
+     /tmp/ccAH4lLW.s:80     .text:000000000000005c $a
+     /tmp/ccAH4lLW.s:111    .text:00000000000000a0 $d
+     /tmp/ccAH4lLW.s:118    .text:00000000000000a8 putc_serial0
+     /tmp/ccAH4lLW.s:129    .text:00000000000000a8 $a
+     /tmp/ccAH4lLW.s:143    .text:00000000000000c8 $d
+     /tmp/ccAH4lLW.s:150    .text:00000000000000d0 putstring_serial0
+     /tmp/ccAH4lLW.s:157    .text:00000000000000d0 $a
+     /tmp/ccAH4lLW.s:186    .text:00000000000000f8 getkey_serial0
+     /tmp/ccAH4lLW.s:209    .text:0000000000000114 $d
+     /tmp/ccAH4lLW.s:216    .text:000000000000011c getc0
+     /tmp/ccAH4lLW.s:227    .text:000000000000011c $a
+     /tmp/ccAH4lLW.s:239    .text:0000000000000138 $d
+
+UNDEFINED SYMBOLS
+__udivsi3

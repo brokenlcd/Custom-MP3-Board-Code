@@ -1,0 +1,646 @@
+   1              		.file	"vs1002.c"
+   9              	.Ltext0:
+  10              		.align	2
+  11              		.global	vs1002Config
+  13              	vs1002Config:
+  14              	.LFB3:
+  15              		.file 1 "../lib/vs1002.c"
+   1:../lib/vs1002.c **** /* *********************************************************
+   2:../lib/vs1002.c **** 	VS1002 MP3 Library. 
+   3:../lib/vs1002.c **** 	Must include the vs1002.h header file.  
+   4:../lib/vs1002.c **** 	Variable SONG_BYTES_BUFFEREDs should be defined in an 
+   5:../lib/vs1002.c **** 	external header file and included in this library.
+   6:../lib/vs1002.c **** 	
+   7:../lib/vs1002.c **** 	Library contains the following functions:
+   8:../lib/vs1002.c **** 	
+   9:../lib/vs1002.c **** 	vs1002_initialize(void);		
+  10:../lib/vs1002.c **** 	vs1002_SCI_read(unsigned char);
+  11:../lib/vs1002.c **** 	vs1002_SCI_write(unsigned char, unsigned short int);
+  12:../lib/vs1002.c **** 	vs1002_send_music(unsigned char*);
+  13:../lib/vs1002.c **** 	vs1002_sineTest(unsigned char);
+  14:../lib/vs1002.c **** 	vs1002_config(void);
+  15:../lib/vs1002.c **** 	vs1002_finish(void);
+  16:../lib/vs1002.c **** 	vs1002_mute(void);
+  17:../lib/vs1002.c **** 	vs1002_setVolume(char setting);
+  18:../lib/vs1002.c **** 	
+  19:../lib/vs1002.c **** 	Written by Ryan Owens - 2/1/2008
+  20:../lib/vs1002.c ****   ********************************************************* */
+  21:../lib/vs1002.c **** 
+  22:../lib/vs1002.c **** /**********************************************************
+  23:../lib/vs1002.c ****                   Header files
+  24:../lib/vs1002.c ****  **********************************************************/
+  25:../lib/vs1002.c **** #include "LPC214x.h"		//Common LPC2148 definitions
+  26:../lib/vs1002.c **** #include "spi0.h"			//SPI port 0 communication
+  27:../lib/vs1002.c **** #include "MP3Dev.h"			//Defines SONG_BYTES_BUFFERED
+  28:../lib/vs1002.c **** #include "vs1002.h"			//Contains Registers/Bit Masks for vs1002
+  29:../lib/vs1002.c **** #include "rprintf.h"
+  30:../lib/vs1002.c **** #include "serial.h"
+  31:../lib/vs1002.c **** 
+  32:../lib/vs1002.c **** /**********************************************************
+  33:../lib/vs1002.c ****                        Functions
+  34:../lib/vs1002.c **** **********************************************************/
+  35:../lib/vs1002.c **** //Usage: vs1002Init();
+  36:../lib/vs1002.c **** //Inputs: None
+  37:../lib/vs1002.c **** //Outputs: None
+  38:../lib/vs1002.c **** //Description: Initializes the vs1002 mp3 player to "New" modes
+  39:../lib/vs1002.c **** //			   and double clock frequency.
+  40:../lib/vs1002.c **** void vs1002Init(void){
+  41:../lib/vs1002.c **** 	vs1002SCIWrite(SCI_MODE, SM_SDINEW);
+  42:../lib/vs1002.c **** 	delay_ms(1);
+  43:../lib/vs1002.c **** 	vs1002SCIWrite(SCI_CLOCKF, (SC_DOUBLECLK | SC_INCLK));
+  44:../lib/vs1002.c **** }
+  45:../lib/vs1002.c **** 
+  46:../lib/vs1002.c **** //Usage: vs1002Config()
+  47:../lib/vs1002.c **** //Inputs: None
+  48:../lib/vs1002.c **** //Outputs: None
+  49:../lib/vs1002.c **** //Description: Configures the LPC2148 for communication with the mp3 player
+  50:../lib/vs1002.c **** void vs1002Config(void){
+  16              		.loc 1 50 0
+  17              		@ Function supports interworking.
+  18              		@ args = 0, pretend = 0, frame = 0
+  19              		@ frame_needed = 0, uses_anonymous_args = 0
+  20              		@ link register save eliminated.
+  21              	.LVL0:
+  51:../lib/vs1002.c **** 	
+  52:../lib/vs1002.c **** 	//Setup I/O Ports
+  53:../lib/vs1002.c **** 	PINSEL0	|= (SCLK_PINSEL | MISO_PINSEL | MOSI_PINSEL);	// SPI pin connections
+  22              		.loc 1 53 0
+  23 0000 1C309FE5 		ldr	r3, .L3
+  24 0004 002093E5 		ldr	r2, [r3, #0]
+  25 0008 152C82E3 		orr	r2, r2, #5376
+  26 000c 002083E5 		str	r2, [r3, #0]
+  54:../lib/vs1002.c **** 	PINSEL0 &= 0x0FFFFF0F;									
+  27              		.loc 1 54 0
+  28 0010 002093E5 		ldr	r2, [r3, #0]
+  29 0014 0F22C2E3 		bic	r2, r2, #-268435456
+  30 0018 F020C2E3 		bic	r2, r2, #240
+  31              		.loc 1 50 0
+  32              		@ lr needed for prologue
+  33              		.loc 1 54 0
+  34 001c 002083E5 		str	r2, [r3, #0]
+  55:../lib/vs1002.c **** 	
+  56:../lib/vs1002.c **** }
+  35              		.loc 1 56 0
+  36 0020 1EFF2FE1 		bx	lr
+  37              	.L4:
+  38              		.align	2
+  39              	.L3:
+  40 0024 00C002E0 		.word	-536690688
+  41              	.LFE3:
+  43              		.align	2
+  44              		.global	vs1002Finish
+  46              	vs1002Finish:
+  47              	.LFB4:
+  57:../lib/vs1002.c **** 
+  58:../lib/vs1002.c **** //Usage: vs1002Finish();
+  59:../lib/vs1002.c **** //Inputs: None
+  60:../lib/vs1002.c **** //Outputs: None
+  61:../lib/vs1002.c **** //Description: Relinquishes control of the SPI lines to the MP3 player
+  62:../lib/vs1002.c **** void vs1002Finish(void){
+  48              		.loc 1 62 0
+  49              		@ Function supports interworking.
+  50              		@ args = 0, pretend = 0, frame = 0
+  51              		@ frame_needed = 0, uses_anonymous_args = 0
+  52              		@ link register save eliminated.
+  53              	.LVL1:
+  63:../lib/vs1002.c **** 	PINSEL0 &= 0xFFFFC00F;		// Relinquish SPI pin connections
+  54              		.loc 1 63 0
+  55 0028 10209FE5 		ldr	r2, .L7
+  56 002c 003092E5 		ldr	r3, [r2, #0]
+  57 0030 FF3DC3E3 		bic	r3, r3, #16320
+  58 0034 3030C3E3 		bic	r3, r3, #48
+  59              		.loc 1 62 0
+  60              		@ lr needed for prologue
+  61              		.loc 1 63 0
+  62 0038 003082E5 		str	r3, [r2, #0]
+  64:../lib/vs1002.c **** }
+  63              		.loc 1 64 0
+  64 003c 1EFF2FE1 		bx	lr
+  65              	.L8:
+  66              		.align	2
+  67              	.L7:
+  68 0040 00C002E0 		.word	-536690688
+  69              	.LFE4:
+  71              		.align	2
+  72              		.global	vs1002SCIWrite
+  74              	vs1002SCIWrite:
+  75              	.LFB6:
+  65:../lib/vs1002.c **** 
+  66:../lib/vs1002.c **** //Usage: register_value = vs1002SCIRead(SCI_MODE);
+  67:../lib/vs1002.c **** //Inputs: unsigned char address - Address of the register to be read
+  68:../lib/vs1002.c **** //Ouputs: None
+  69:../lib/vs1002.c **** //Description: Returns the value of the vs1002 register defined by "address"
+  70:../lib/vs1002.c **** unsigned short int vs1002SCIRead(unsigned char address)
+  71:../lib/vs1002.c **** {
+  72:../lib/vs1002.c **** 	unsigned short int temp;
+  73:../lib/vs1002.c **** 	SELECT_MP3_SCI();
+  74:../lib/vs1002.c **** 	
+  75:../lib/vs1002.c **** 	//delay_ms(1);
+  76:../lib/vs1002.c **** 	SPI0_send(READ_COMMAND);
+  77:../lib/vs1002.c **** 	SPI0_send(address);
+  78:../lib/vs1002.c ****    	temp = 	SPI0_recv();					
+  79:../lib/vs1002.c ****    	temp <<= 8;							
+  80:../lib/vs1002.c ****    	temp |= SPI0_recv();				
+  81:../lib/vs1002.c **** 	//delay_ms(1);
+  82:../lib/vs1002.c **** 	UNSELECT_MP3_SCI();
+  83:../lib/vs1002.c **** 	
+  84:../lib/vs1002.c **** 	delay_ms(1);
+  85:../lib/vs1002.c **** 	return temp;
+  86:../lib/vs1002.c **** }
+  87:../lib/vs1002.c **** 
+  88:../lib/vs1002.c **** //Usage: vs1002SCIWrite(SCI_MODE, SM_SDINEW);
+  89:../lib/vs1002.c **** //Inputs: unsigned char address - Adress of the register to be written to
+  90:../lib/vs1002.c **** //		  unsigned short int data - Data to write to the register
+  91:../lib/vs1002.c **** //Outputs: None
+  92:../lib/vs1002.c **** //Description: Writes "data" to the register defined in "address"
+  93:../lib/vs1002.c **** void vs1002SCIWrite(unsigned char address, unsigned short int data)
+  94:../lib/vs1002.c **** {	
+  76              		.loc 1 94 0
+  77              		@ Function supports interworking.
+  78              		@ args = 0, pretend = 0, frame = 0
+  79              		@ frame_needed = 0, uses_anonymous_args = 0
+  80              	.LVL2:
+  95:../lib/vs1002.c **** 	SELECT_MP3_SCI();
+  81              		.loc 1 95 0
+  82 0044 50309FE5 		ldr	r3, .L11
+  83              		.loc 1 94 0
+  84 0048 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+  85              	.LCFI0:
+  86              		.loc 1 95 0
+  87 004c 0166A0E3 		mov	r6, #1048576
+  88 0050 006083E5 		str	r6, [r3, #0]
+  89              		.loc 1 94 0
+  90 0054 FF5000E2 		and	r5, r0, #255
+  96:../lib/vs1002.c **** 
+  97:../lib/vs1002.c **** 	SPI0_send(WRITE_COMMAND);
+  91              		.loc 1 97 0
+  92 0058 0200A0E3 		mov	r0, #2
+  93              	.LVL3:
+  94              		.loc 1 94 0
+  95 005c 0148A0E1 		mov	r4, r1, asl #16
+  96              		.loc 1 97 0
+  97 0060 FEFFFFEB 		bl	SPI0_send
+  98              	.LVL4:
+  98:../lib/vs1002.c **** 	SPI0_send(address);
+  99              		.loc 1 98 0
+ 100 0064 0500A0E1 		mov	r0, r5
+ 101 0068 FEFFFFEB 		bl	SPI0_send
+  99:../lib/vs1002.c **** 	SPI0_send(data >> 8);						// Send High Byte of data
+ 102              		.loc 1 99 0
+ 103 006c 240CA0E1 		mov	r0, r4, lsr #24
+ 104              		.loc 1 94 0
+ 105 0070 2448A0E1 		mov	r4, r4, lsr #16
+ 106              	.LVL5:
+ 100:../lib/vs1002.c **** 	SPI0_send(data & 0x00ff);					// Send Low Byte of data
+ 107              		.loc 1 100 0
+ 108 0074 FF4004E2 		and	r4, r4, #255
+ 109              	.LVL6:
+ 110              		.loc 1 99 0
+ 111 0078 FEFFFFEB 		bl	SPI0_send
+ 112              		.loc 1 100 0
+ 113 007c 0400A0E1 		mov	r0, r4
+ 114 0080 FEFFFFEB 		bl	SPI0_send
+ 101:../lib/vs1002.c **** 
+ 102:../lib/vs1002.c **** 	UNSELECT_MP3_SCI();
+ 115              		.loc 1 102 0
+ 116 0084 14309FE5 		ldr	r3, .L11+4
+ 103:../lib/vs1002.c **** 	delay_ms(1);
+ 117              		.loc 1 103 0
+ 118 0088 0100A0E3 		mov	r0, #1
+ 119              		.loc 1 102 0
+ 120 008c 006083E5 		str	r6, [r3, #0]
+ 121              		.loc 1 103 0
+ 122 0090 FEFFFFEB 		bl	delay_ms
+ 104:../lib/vs1002.c **** }
+ 123              		.loc 1 104 0
+ 124 0094 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 125 0098 1EFF2FE1 		bx	lr
+ 126              	.L12:
+ 127              		.align	2
+ 128              	.L11:
+ 129 009c 0C8002E0 		.word	-536707060
+ 130 00a0 048002E0 		.word	-536707068
+ 131              	.LFE6:
+ 133              		.align	2
+ 134              		.global	vs1002Init
+ 136              	vs1002Init:
+ 137              	.LFB2:
+ 138              		.loc 1 40 0
+ 139              		@ Function supports interworking.
+ 140              		@ args = 0, pretend = 0, frame = 0
+ 141              		@ frame_needed = 0, uses_anonymous_args = 0
+ 142              	.LVL7:
+ 143 00a4 04E02DE5 		str	lr, [sp, #-4]!
+ 144              	.LCFI1:
+ 145              		.loc 1 41 0
+ 146 00a8 021BA0E3 		mov	r1, #2048
+ 147 00ac 0000A0E3 		mov	r0, #0
+ 148 00b0 FEFFFFEB 		bl	vs1002SCIWrite
+ 149              		.loc 1 42 0
+ 150 00b4 0100A0E3 		mov	r0, #1
+ 151 00b8 FEFFFFEB 		bl	delay_ms
+ 152              		.loc 1 43 0
+ 153 00bc 08109FE5 		ldr	r1, .L15
+ 154 00c0 0300A0E3 		mov	r0, #3
+ 155              		.loc 1 44 0
+ 156 00c4 04E09DE4 		ldr	lr, [sp], #4
+ 157              		.loc 1 43 0
+ 158 00c8 FEFFFFEA 		b	vs1002SCIWrite
+ 159              	.L16:
+ 160              		.align	2
+ 161              	.L15:
+ 162 00cc 64990000 		.word	39268
+ 163              	.LFE2:
+ 165              		.align	2
+ 166              		.global	vs1002SCIRead
+ 168              	vs1002SCIRead:
+ 169              	.LFB5:
+ 170              		.loc 1 71 0
+ 171              		@ Function supports interworking.
+ 172              		@ args = 0, pretend = 0, frame = 0
+ 173              		@ frame_needed = 0, uses_anonymous_args = 0
+ 174              	.LVL8:
+ 175              		.loc 1 73 0
+ 176 00d0 54309FE5 		ldr	r3, .L19
+ 177              		.loc 1 71 0
+ 178 00d4 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 179              	.LCFI2:
+ 180              		.loc 1 73 0
+ 181 00d8 0166A0E3 		mov	r6, #1048576
+ 182 00dc 006083E5 		str	r6, [r3, #0]
+ 183              		.loc 1 71 0
+ 184 00e0 FF4000E2 		and	r4, r0, #255
+ 185              		.loc 1 76 0
+ 186 00e4 0300A0E3 		mov	r0, #3
+ 187              	.LVL9:
+ 188 00e8 FEFFFFEB 		bl	SPI0_send
+ 189              		.loc 1 77 0
+ 190 00ec 0400A0E1 		mov	r0, r4
+ 191 00f0 FEFFFFEB 		bl	SPI0_send
+ 192              		.loc 1 78 0
+ 193 00f4 FEFFFFEB 		bl	SPI0_recv
+ 194              		.loc 1 79 0
+ 195 00f8 004CA0E1 		mov	r4, r0, asl #24
+ 196              	.LVL10:
+ 197              		.loc 1 80 0
+ 198 00fc FEFFFFEB 		bl	SPI0_recv
+ 199              		.loc 1 82 0
+ 200 0100 28309FE5 		ldr	r3, .L19+4
+ 201              		.loc 1 80 0
+ 202 0104 0050A0E1 		mov	r5, r0
+ 203              		.loc 1 82 0
+ 204 0108 006083E5 		str	r6, [r3, #0]
+ 205              		.loc 1 84 0
+ 206 010c 0100A0E3 		mov	r0, #1
+ 207 0110 FEFFFFEB 		bl	delay_ms
+ 208              		.loc 1 79 0
+ 209 0114 2448A0E1 		mov	r4, r4, lsr #16
+ 210              	.LVL11:
+ 211              		.loc 1 84 0
+ 212 0118 054084E1 		orr	r4, r4, r5
+ 213              	.LVL12:
+ 214 011c 0448A0E1 		mov	r4, r4, asl #16
+ 215              		.loc 1 86 0
+ 216 0120 2408A0E1 		mov	r0, r4, lsr #16
+ 217 0124 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 218 0128 1EFF2FE1 		bx	lr
+ 219              	.L20:
+ 220              		.align	2
+ 221              	.L19:
+ 222 012c 0C8002E0 		.word	-536707060
+ 223 0130 048002E0 		.word	-536707068
+ 224              	.LFE5:
+ 226              		.align	2
+ 227              		.global	vs1002SineTest
+ 229              	vs1002SineTest:
+ 230              	.LFB7:
+ 105:../lib/vs1002.c **** 
+ 106:../lib/vs1002.c **** //Usage: vs1002SineTest(126);
+ 107:../lib/vs1002.c **** //Inputs: unsigned char pitch - pitch of the sine wave to be produced
+ 108:../lib/vs1002.c **** //Outputs: None
+ 109:../lib/vs1002.c **** //Description: Runs the Sine Test defined in the vs1002 datasheet
+ 110:../lib/vs1002.c **** //**NOTE: ** for a sine wave test @ 5168 hz, send sequence: 0x53, 0xEF, 0x6E, 126, 0, 0, 0, 0
+ 111:../lib/vs1002.c **** void vs1002SineTest(unsigned char pitch)
+ 112:../lib/vs1002.c **** {
+ 231              		.loc 1 112 0
+ 232              		@ Function supports interworking.
+ 233              		@ args = 0, pretend = 0, frame = 0
+ 234              		@ frame_needed = 0, uses_anonymous_args = 0
+ 235              	.LVL13:
+ 113:../lib/vs1002.c **** 	SELECT_MP3_SDI();
+ 236              		.loc 1 113 0
+ 237 0134 60309FE5 		ldr	r3, .L23
+ 238              		.loc 1 112 0
+ 239 0138 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 240              	.LCFI3:
+ 241              		.loc 1 113 0
+ 242 013c 0158A0E3 		mov	r5, #65536
+ 243 0140 005083E5 		str	r5, [r3, #0]
+ 244              		.loc 1 112 0
+ 245 0144 0040A0E1 		mov	r4, r0
+ 114:../lib/vs1002.c **** 	
+ 115:../lib/vs1002.c ****    	SPI0_send(0x53);
+ 246              		.loc 1 115 0
+ 247 0148 5300A0E3 		mov	r0, #83
+ 248              	.LVL14:
+ 249 014c FEFFFFEB 		bl	SPI0_send
+ 116:../lib/vs1002.c **** 	SPI0_send(0xEF);
+ 250              		.loc 1 116 0
+ 251 0150 EF00A0E3 		mov	r0, #239
+ 252 0154 FEFFFFEB 		bl	SPI0_send
+ 253              		.loc 1 112 0
+ 254 0158 FF4004E2 		and	r4, r4, #255
+ 117:../lib/vs1002.c **** 	SPI0_send(0x6E);
+ 255              		.loc 1 117 0
+ 256 015c 6E00A0E3 		mov	r0, #110
+ 257 0160 FEFFFFEB 		bl	SPI0_send
+ 118:../lib/vs1002.c ****    	SPI0_send(pitch);						//Send the Pitch	
+ 258              		.loc 1 118 0
+ 259 0164 0400A0E1 		mov	r0, r4
+ 260 0168 FEFFFFEB 		bl	SPI0_send
+ 119:../lib/vs1002.c **** 	SPI0_send(0);
+ 261              		.loc 1 119 0
+ 262 016c 0000A0E3 		mov	r0, #0
+ 263 0170 FEFFFFEB 		bl	SPI0_send
+ 120:../lib/vs1002.c **** 	SPI0_send(0);
+ 264              		.loc 1 120 0
+ 265 0174 0000A0E3 		mov	r0, #0
+ 266 0178 FEFFFFEB 		bl	SPI0_send
+ 121:../lib/vs1002.c **** 	SPI0_send(0);
+ 267              		.loc 1 121 0
+ 268 017c 0000A0E3 		mov	r0, #0
+ 269 0180 FEFFFFEB 		bl	SPI0_send
+ 122:../lib/vs1002.c **** 	SPI0_send(0);
+ 270              		.loc 1 122 0
+ 271 0184 0000A0E3 		mov	r0, #0
+ 272 0188 FEFFFFEB 		bl	SPI0_send
+ 123:../lib/vs1002.c **** 	
+ 124:../lib/vs1002.c ****    	UNSELECT_MP3_SDI();
+ 273              		.loc 1 124 0
+ 274 018c 0C309FE5 		ldr	r3, .L23+4
+ 275 0190 005083E5 		str	r5, [r3, #0]
+ 125:../lib/vs1002.c **** }
+ 276              		.loc 1 125 0
+ 277 0194 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 278 0198 1EFF2FE1 		bx	lr
+ 279              	.L24:
+ 280              		.align	2
+ 281              	.L23:
+ 282 019c 1C8002E0 		.word	-536707044
+ 283 01a0 148002E0 		.word	-536707052
+ 284              	.LFE7:
+ 286              		.align	2
+ 287              		.global	vs1002Mute
+ 289              	vs1002Mute:
+ 290              	.LFB8:
+ 126:../lib/vs1002.c **** 
+ 127:../lib/vs1002.c **** //Usage: vs1002Mute();
+ 128:../lib/vs1002.c **** //Inputs: None
+ 129:../lib/vs1002.c **** //Outputs: None
+ 130:../lib/vs1002.c **** //Description: Mutes the output of the vs1002 MP3 player
+ 131:../lib/vs1002.c **** void vs1002Mute(void){
+ 291              		.loc 1 131 0
+ 292              		@ Function supports interworking.
+ 293              		@ args = 0, pretend = 0, frame = 0
+ 294              		@ frame_needed = 0, uses_anonymous_args = 0
+ 295              		@ link register save eliminated.
+ 296              	.LVL15:
+ 132:../lib/vs1002.c **** 	vs1002SCIWrite(SCI_VOL, SV_MUTE);
+ 297              		.loc 1 132 0
+ 298 01a4 04109FE5 		ldr	r1, .L27
+ 299 01a8 0B00A0E3 		mov	r0, #11
+ 300              		.loc 1 131 0
+ 301              		@ lr needed for prologue
+ 133:../lib/vs1002.c **** }
+ 302              		.loc 1 133 0
+ 303              		.loc 1 132 0
+ 304 01ac FEFFFFEA 		b	vs1002SCIWrite
+ 305              	.L28:
+ 306              		.align	2
+ 307              	.L27:
+ 308 01b0 FFFF0000 		.word	65535
+ 309              	.LFE8:
+ 311              		.align	2
+ 312              		.global	vs1002SetVolume
+ 314              	vs1002SetVolume:
+ 315              	.LFB9:
+ 134:../lib/vs1002.c **** 
+ 135:../lib/vs1002.c **** 
+ 136:../lib/vs1002.c **** //Usage: vs1002SetVolume(INCREASE);
+ 137:../lib/vs1002.c **** //Inputs: char setting - either INCREASE(1) or DECREASE(0)
+ 138:../lib/vs1002.c **** //Outputs: None
+ 139:../lib/vs1002.c **** //Description: Increases or decreases the volume of the MP3 player based on the value of "setting"
+ 140:../lib/vs1002.c **** void vs1002SetVolume(char setting){
+ 316              		.loc 1 140 0
+ 317              		@ Function supports interworking.
+ 318              		@ args = 0, pretend = 0, frame = 0
+ 319              		@ frame_needed = 0, uses_anonymous_args = 0
+ 320              	.LVL16:
+ 321 01b4 10402DE9 		stmfd	sp!, {r4, lr}
+ 322              	.LCFI4:
+ 323              		.loc 1 140 0
+ 324 01b8 FF4000E2 		and	r4, r0, #255
+ 141:../lib/vs1002.c **** 	unsigned short int currentVolume=0;
+ 142:../lib/vs1002.c **** 	
+ 143:../lib/vs1002.c **** 	currentVolume = vs1002SCIRead(SCI_VOL);
+ 325              		.loc 1 143 0
+ 326 01bc 0B00A0E3 		mov	r0, #11
+ 327              	.LVL17:
+ 328 01c0 FEFFFFEB 		bl	vs1002SCIRead
+ 144:../lib/vs1002.c **** 	if(setting == INCREASE){
+ 329              		.loc 1 144 0
+ 330 01c4 310054E3 		cmp	r4, #49
+ 331 01c8 7600001A 		bne	.L30
+ 332              	.LVL18:
+ 145:../lib/vs1002.c **** 		if(currentVolume == SV_MAX_VOLUME);	//Don't Change the current volume
+ 146:../lib/vs1002.c **** 		else currentVolume -= 0x0808;		//Increment both channels equally
+ 333              		.loc 1 146 0
+ 334 01cc 023B40E2 		sub	r3, r0, #2048
+ 335 01d0 083043E2 		sub	r3, r3, #8
+ 336 01d4 0338A0E1 		mov	r3, r3, asl #16
+ 337              		.loc 1 145 0
+ 338 01d8 000050E3 		cmp	r0, #0
+ 339 01dc 7B0000EA 		b	.L37
+ 340              	.LVL19:
+ 341              	.L30:
+ 342              	.LVL20:
+ 147:../lib/vs1002.c **** 	}
+ 148:../lib/vs1002.c **** 	else{
+ 149:../lib/vs1002.c **** 		if(currentVolume == SV_MUTE);			//Don't change the current volume
+ 150:../lib/vs1002.c **** 		else currentVolume += 0x0808;
+ 343              		.loc 1 150 0
+ 344 01e0 023B80E2 		add	r3, r0, #2048
+ 345              		.loc 1 149 0
+ 346 01e4 1C209FE5 		ldr	r2, .L38
+ 347              		.loc 1 150 0
+ 348 01e8 083083E2 		add	r3, r3, #8
+ 349              		.loc 1 149 0
+ 350 01ec 020050E1 		cmp	r0, r2
+ 351              		.loc 1 150 0
+ 352 01f0 0338A0E1 		mov	r3, r3, asl #16
+ 353              	.L37:
+ 354 01f4 2308A011 		movne	r0, r3, lsr #16
+ 151:../lib/vs1002.c **** 	}
+ 152:../lib/vs1002.c **** 	vs1002SCIWrite(SCI_VOL, currentVolume);
+ 355              		.loc 1 152 0
+ 356 01f8 0010A0E1 		mov	r1, r0
+ 357 01fc 0B00A0E3 		mov	r0, #11
+ 358              	.LVL21:
+ 153:../lib/vs1002.c **** }
+ 359              		.loc 1 153 0
+ 360 0200 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 361              		.loc 1 152 0
+ 362 0204 FEFFFFEA 		b	vs1002SCIWrite
+ 363              	.LVL22:
+ 364              	.L39:
+ 365              		.align	2
+ 366              	.L38:
+ 367 0208 FFFF0000 		.word	65535
+ 368              	.LFE9:
+ 370              		.align	2
+ 371              		.global	vs1002SendMusic
+ 373              	vs1002SendMusic:
+ 374              	.LFB10:
+ 154:../lib/vs1002.c **** 
+ 155:../lib/vs1002.c **** //Usage: vs1002SendMusic(bufferedSongData, BUFFERSIZE);
+ 156:../lib/vs1002.c **** //Inputs: unsigned char* songData - pointer to MP3 data that is to be sent to mp3 player
+ 157:../lib/vs1002.c **** //		  int buffer_size - size of song data in bytes
+ 158:../lib/vs1002.c **** //Outputs: None
+ 159:../lib/vs1002.c **** //Description: Sends the data in the songData buffer to the MP3 player
+ 160:../lib/vs1002.c **** void vs1002SendMusic(unsigned char* songData, int buffer_size){
+ 375              		.loc 1 160 0
+ 376              		@ Function supports interworking.
+ 377              		@ args = 0, pretend = 0, frame = 0
+ 378              		@ frame_needed = 0, uses_anonymous_args = 0
+ 379              	.LVL23:
+ 380 020c 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 381              	.LCFI5:
+ 161:../lib/vs1002.c **** 	SELECT_MP3_SDI();
+ 382              		.loc 1 161 0
+ 383 0210 3C309FE5 		ldr	r3, .L45
+ 384 0214 0128A0E3 		mov	r2, #65536
+ 385              		.loc 1 160 0
+ 386 0218 0060A0E1 		mov	r6, r0
+ 387 021c 0150A0E1 		mov	r5, r1
+ 388              		.loc 1 161 0
+ 389 0220 0040A0E3 		mov	r4, #0
+ 390              	.LVL24:
+ 391 0224 002083E5 		str	r2, [r3, #0]
+ 392 0228 8C0000EA 		b	.L41
+ 393              	.LVL25:
+ 394              	.L42:
+ 395              	.LBB2:
+ 162:../lib/vs1002.c **** 	for(int i=0; i<buffer_size; i++){
+ 163:../lib/vs1002.c **** 		SPI0_send(*songData++);			//Send the buffered byte of data, then increment the buffer position
+ 396              		.loc 1 163 0
+ 397 022c 0600D4E7 		ldrb	r0, [r4, r6]	@ zero_extendqisi2
+ 398 0230 FEFFFFEB 		bl	SPI0_send
+ 399              		.loc 1 162 0
+ 400 0234 014084E2 		add	r4, r4, #1
+ 401              	.LVL26:
+ 402              	.L41:
+ 403 0238 050054E1 		cmp	r4, r5
+ 404 023c 890000BA 		blt	.L42
+ 405              	.LBE2:
+ 164:../lib/vs1002.c **** 	}
+ 165:../lib/vs1002.c **** 	UNSELECT_MP3_SDI();
+ 406              		.loc 1 165 0
+ 407 0240 10309FE5 		ldr	r3, .L45+4
+ 408 0244 0128A0E3 		mov	r2, #65536
+ 409 0248 002083E5 		str	r2, [r3, #0]
+ 166:../lib/vs1002.c **** }
+ 410              		.loc 1 166 0
+ 411 024c 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 412 0250 1EFF2FE1 		bx	lr
+ 413              	.L46:
+ 414              		.align	2
+ 415              	.L45:
+ 416 0254 1C8002E0 		.word	-536707044
+ 417 0258 148002E0 		.word	-536707052
+ 418              	.LFE10:
+ 420              		.align	2
+ 421              		.global	vs1002Reset
+ 423              	vs1002Reset:
+ 424              	.LFB11:
+ 167:../lib/vs1002.c **** 
+ 168:../lib/vs1002.c **** //Usage: vs1002Reset();
+ 169:../lib/vs1002.c **** //Inputs: None
+ 170:../lib/vs1002.c **** //Outputs: None
+ 171:../lib/vs1002.c **** //Description: Resets the mp3 player
+ 172:../lib/vs1002.c **** void vs1002Reset(void){
+ 425              		.loc 1 172 0
+ 426              		@ Function supports interworking.
+ 427              		@ args = 0, pretend = 0, frame = 0
+ 428              		@ frame_needed = 0, uses_anonymous_args = 0
+ 429              	.LVL27:
+ 173:../lib/vs1002.c **** 	//Reset the MP3 Player and make sure the mp3 player doesn't try to boot from SPI
+ 174:../lib/vs1002.c **** 	IOCLR0 = MP3_GPIO0;		//Pull GPIO0 low
+ 430              		.loc 1 174 0
+ 431 025c 2C309FE5 		ldr	r3, .L49
+ 432 0260 0228A0E3 		mov	r2, #131072
+ 433              		.loc 1 172 0
+ 434 0264 10402DE9 		stmfd	sp!, {r4, lr}
+ 435              	.LCFI6:
+ 436              		.loc 1 174 0
+ 437 0268 002083E5 		str	r2, [r3, #0]
+ 175:../lib/vs1002.c **** 	IOCLR1 = MP3_XRES;		//Reset the vs1002
+ 438              		.loc 1 175 0
+ 439 026c 0144A0E3 		mov	r4, #16777216
+ 440 0270 103083E2 		add	r3, r3, #16
+ 441 0274 004083E5 		str	r4, [r3, #0]
+ 176:../lib/vs1002.c **** 	delay_ms(10);			//Hold Reset
+ 442              		.loc 1 176 0
+ 443 0278 0A00A0E3 		mov	r0, #10
+ 444 027c FEFFFFEB 		bl	delay_ms
+ 177:../lib/vs1002.c **** 	IOSET1 = MP3_XRES;		//Bring vs1002 out of reset
+ 445              		.loc 1 177 0
+ 446 0280 0C309FE5 		ldr	r3, .L49+4
+ 447 0284 004083E5 		str	r4, [r3, #0]
+ 178:../lib/vs1002.c **** }
+ 448              		.loc 1 178 0
+ 449 0288 1040BDE8 		ldmfd	sp!, {r4, lr}
+ 450 028c 1EFF2FE1 		bx	lr
+ 451              	.L50:
+ 452              		.align	2
+ 453              	.L49:
+ 454 0290 0C8002E0 		.word	-536707060
+ 455 0294 148002E0 		.word	-536707052
+ 456              	.LFE11:
+ 622              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 vs1002.c
+     /tmp/ccdc9070.s:13     .text:0000000000000000 vs1002Config
+     /tmp/ccdc9070.s:23     .text:0000000000000000 $a
+     /tmp/ccdc9070.s:40     .text:0000000000000024 $d
+     /tmp/ccdc9070.s:46     .text:0000000000000028 vs1002Finish
+     /tmp/ccdc9070.s:55     .text:0000000000000028 $a
+     /tmp/ccdc9070.s:68     .text:0000000000000040 $d
+     /tmp/ccdc9070.s:74     .text:0000000000000044 vs1002SCIWrite
+     /tmp/ccdc9070.s:82     .text:0000000000000044 $a
+     /tmp/ccdc9070.s:129    .text:000000000000009c $d
+     /tmp/ccdc9070.s:136    .text:00000000000000a4 vs1002Init
+     /tmp/ccdc9070.s:143    .text:00000000000000a4 $a
+     /tmp/ccdc9070.s:162    .text:00000000000000cc $d
+     /tmp/ccdc9070.s:168    .text:00000000000000d0 vs1002SCIRead
+     /tmp/ccdc9070.s:176    .text:00000000000000d0 $a
+     /tmp/ccdc9070.s:222    .text:000000000000012c $d
+     /tmp/ccdc9070.s:229    .text:0000000000000134 vs1002SineTest
+     /tmp/ccdc9070.s:237    .text:0000000000000134 $a
+     /tmp/ccdc9070.s:282    .text:000000000000019c $d
+     /tmp/ccdc9070.s:289    .text:00000000000001a4 vs1002Mute
+     /tmp/ccdc9070.s:298    .text:00000000000001a4 $a
+     /tmp/ccdc9070.s:308    .text:00000000000001b0 $d
+     /tmp/ccdc9070.s:314    .text:00000000000001b4 vs1002SetVolume
+     /tmp/ccdc9070.s:321    .text:00000000000001b4 $a
+     /tmp/ccdc9070.s:367    .text:0000000000000208 $d
+     /tmp/ccdc9070.s:373    .text:000000000000020c vs1002SendMusic
+     /tmp/ccdc9070.s:380    .text:000000000000020c $a
+     /tmp/ccdc9070.s:416    .text:0000000000000254 $d
+     /tmp/ccdc9070.s:423    .text:000000000000025c vs1002Reset
+     /tmp/ccdc9070.s:431    .text:000000000000025c $a
+     /tmp/ccdc9070.s:454    .text:0000000000000290 $d
+
+UNDEFINED SYMBOLS
+SPI0_send
+delay_ms
+SPI0_recv

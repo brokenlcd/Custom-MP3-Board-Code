@@ -1,0 +1,2510 @@
+   1              		.file	"sd_raw.c"
+   9              	.Ltext0:
+  10              		.align	2
+  11              		.global	sd_raw_available
+  13              	sd_raw_available:
+  14              	.LFB3:
+  15              		.file 1 "../lib/sd_raw.c"
+   1:../lib/sd_raw.c **** 
+   2:../lib/sd_raw.c **** /* This program is free software; you can redistribute it and/or modify
+   3:../lib/sd_raw.c ****  * it under the terms of the GNU General Public License version 2 as
+   4:../lib/sd_raw.c ****  * published by the Free Software Foundation.
+   5:../lib/sd_raw.c ****  */
+   6:../lib/sd_raw.c **** 
+   7:../lib/sd_raw.c **** #include <string.h>
+   8:../lib/sd_raw.c **** #include "sd_raw.h"
+   9:../lib/sd_raw.c **** #include "LPC214x.h"
+  10:../lib/sd_raw.c **** #include <stdio.h>
+  11:../lib/sd_raw.c **** //#include "printmacros.h"
+  12:../lib/sd_raw.c **** #include "rprintf.h"
+  13:../lib/sd_raw.c **** 
+  14:../lib/sd_raw.c **** /**
+  15:../lib/sd_raw.c ****  * \addtogroup sd_raw MMC/SD card raw access
+  16:../lib/sd_raw.c ****  *
+  17:../lib/sd_raw.c ****  * This module implements read and write access to MMC and
+  18:../lib/sd_raw.c ****  * SD cards. It serves as a low-level driver for the higher
+  19:../lib/sd_raw.c ****  * level modules such as partition and file system access.
+  20:../lib/sd_raw.c ****  *
+  21:../lib/sd_raw.c ****  * @{
+  22:../lib/sd_raw.c ****  */
+  23:../lib/sd_raw.c **** /**
+  24:../lib/sd_raw.c ****  * \file
+  25:../lib/sd_raw.c ****  * MMC/SD raw access implementation.
+  26:../lib/sd_raw.c ****  *
+  27:../lib/sd_raw.c ****  * \author Roland Riegel
+  28:../lib/sd_raw.c ****  */
+  29:../lib/sd_raw.c **** 
+  30:../lib/sd_raw.c **** /**
+  31:../lib/sd_raw.c ****  * \addtogroup sd_raw_config MMC/SD configuration
+  32:../lib/sd_raw.c ****  * Preprocessor defines to configure the MMC/SD support.
+  33:../lib/sd_raw.c ****  */
+  34:../lib/sd_raw.c **** 
+  35:../lib/sd_raw.c **** /**
+  36:../lib/sd_raw.c ****  * @}
+  37:../lib/sd_raw.c ****  */
+  38:../lib/sd_raw.c **** 
+  39:../lib/sd_raw.c **** /* commands available in SPI mode */
+  40:../lib/sd_raw.c **** 
+  41:../lib/sd_raw.c **** /* CMD0: response R1 */
+  42:../lib/sd_raw.c **** #define CMD_GO_IDLE_STATE 0x00
+  43:../lib/sd_raw.c **** /* CMD1: response R1 */
+  44:../lib/sd_raw.c **** #define CMD_SEND_OP_COND 0x01
+  45:../lib/sd_raw.c **** /* CMD9: response R1 */
+  46:../lib/sd_raw.c **** #define CMD_SEND_CSD 0x09
+  47:../lib/sd_raw.c **** /* CMD10: response R1 */
+  48:../lib/sd_raw.c **** #define CMD_SEND_CID 0x0a
+  49:../lib/sd_raw.c **** /* CMD12: response R1 */
+  50:../lib/sd_raw.c **** #define CMD_STOP_TRANSMISSION 0x0c
+  51:../lib/sd_raw.c **** /* CMD13: response R2 */
+  52:../lib/sd_raw.c **** #define CMD_SEND_STATUS 0x0d
+  53:../lib/sd_raw.c **** /* CMD16: arg0[31:0]: block length, response R1 */
+  54:../lib/sd_raw.c **** #define CMD_SET_BLOCKLEN 0x10
+  55:../lib/sd_raw.c **** /* CMD17: arg0[31:0]: data address, response R1 */
+  56:../lib/sd_raw.c **** #define CMD_READ_SINGLE_BLOCK 0x11
+  57:../lib/sd_raw.c **** /* CMD18: arg0[31:0]: data address, response R1 */
+  58:../lib/sd_raw.c **** #define CMD_READ_MULTIPLE_BLOCK 0x12
+  59:../lib/sd_raw.c **** /* CMD24: arg0[31:0]: data address, response R1 */
+  60:../lib/sd_raw.c **** #define CMD_WRITE_SINGLE_BLOCK 0x18
+  61:../lib/sd_raw.c **** /* CMD25: arg0[31:0]: data address, response R1 */
+  62:../lib/sd_raw.c **** #define CMD_WRITE_MULTIPLE_BLOCK 0x19
+  63:../lib/sd_raw.c **** /* CMD27: response R1 */
+  64:../lib/sd_raw.c **** #define CMD_PROGRAM_CSD 0x1b
+  65:../lib/sd_raw.c **** /* CMD28: arg0[31:0]: data address, response R1b */
+  66:../lib/sd_raw.c **** #define CMD_SET_WRITE_PROT 0x1c
+  67:../lib/sd_raw.c **** /* CMD29: arg0[31:0]: data address, response R1b */
+  68:../lib/sd_raw.c **** #define CMD_CLR_WRITE_PROT 0x1d
+  69:../lib/sd_raw.c **** /* CMD30: arg0[31:0]: write protect data address, response R1 */
+  70:../lib/sd_raw.c **** #define CMD_SEND_WRITE_PROT 0x1e
+  71:../lib/sd_raw.c **** /* CMD32: arg0[31:0]: data address, response R1 */
+  72:../lib/sd_raw.c **** #define CMD_TAG_SECTOR_START 0x20
+  73:../lib/sd_raw.c **** /* CMD33: arg0[31:0]: data address, response R1 */
+  74:../lib/sd_raw.c **** #define CMD_TAG_SECTOR_END 0x21
+  75:../lib/sd_raw.c **** /* CMD34: arg0[31:0]: data address, response R1 */
+  76:../lib/sd_raw.c **** #define CMD_UNTAG_SECTOR 0x22
+  77:../lib/sd_raw.c **** /* CMD35: arg0[31:0]: data address, response R1 */
+  78:../lib/sd_raw.c **** #define CMD_TAG_ERASE_GROUP_START 0x23
+  79:../lib/sd_raw.c **** /* CMD36: arg0[31:0]: data address, response R1 */
+  80:../lib/sd_raw.c **** #define CMD_TAG_ERASE_GROUP_END 0x24
+  81:../lib/sd_raw.c **** /* CMD37: arg0[31:0]: data address, response R1 */
+  82:../lib/sd_raw.c **** #define CMD_UNTAG_ERASE_GROUP 0x25
+  83:../lib/sd_raw.c **** /* CMD38: arg0[31:0]: stuff bits, response R1b */
+  84:../lib/sd_raw.c **** #define CMD_ERASE 0x26
+  85:../lib/sd_raw.c **** /* CMD42: arg0[31:0]: stuff bits, response R1b */
+  86:../lib/sd_raw.c **** #define CMD_LOCK_UNLOCK 0x2a
+  87:../lib/sd_raw.c **** /* CMD58: response R3 */
+  88:../lib/sd_raw.c **** #define CMD_READ_OCR 0x3a
+  89:../lib/sd_raw.c **** /* CMD59: arg0[31:1]: stuff bits, arg0[0:0]: crc option, response R1 */
+  90:../lib/sd_raw.c **** #define CMD_CRC_ON_OFF 0x3b
+  91:../lib/sd_raw.c **** 
+  92:../lib/sd_raw.c **** /* command responses */
+  93:../lib/sd_raw.c **** /* R1: size 1 byte */
+  94:../lib/sd_raw.c **** #define R1_IDLE_STATE 0
+  95:../lib/sd_raw.c **** #define R1_ERASE_RESET 1
+  96:../lib/sd_raw.c **** #define R1_ILL_COMMAND 2
+  97:../lib/sd_raw.c **** #define R1_COM_CRC_ERR 3
+  98:../lib/sd_raw.c **** #define R1_ERASE_SEQ_ERR 4
+  99:../lib/sd_raw.c **** #define R1_ADDR_ERR 5
+ 100:../lib/sd_raw.c **** #define R1_PARAM_ERR 6
+ 101:../lib/sd_raw.c **** /* R1b: equals R1, additional busy bytes */
+ 102:../lib/sd_raw.c **** /* R2: size 2 bytes */
+ 103:../lib/sd_raw.c **** #define R2_CARD_LOCKED 0
+ 104:../lib/sd_raw.c **** #define R2_WP_ERASE_SKIP 1
+ 105:../lib/sd_raw.c **** #define R2_ERR 2
+ 106:../lib/sd_raw.c **** #define R2_CARD_ERR 3
+ 107:../lib/sd_raw.c **** #define R2_CARD_ECC_FAIL 4
+ 108:../lib/sd_raw.c **** #define R2_WP_VIOLATION 5
+ 109:../lib/sd_raw.c **** #define R2_INVAL_ERASE 6
+ 110:../lib/sd_raw.c **** #define R2_OUT_OF_RANGE 7
+ 111:../lib/sd_raw.c **** #define R2_CSD_OVERWRITE 7
+ 112:../lib/sd_raw.c **** #define R2_IDLE_STATE (R1_IDLE_STATE + 8)
+ 113:../lib/sd_raw.c **** #define R2_ERASE_RESET (R1_ERASE_RESET + 8)
+ 114:../lib/sd_raw.c **** #define R2_ILL_COMMAND (R1_ILL_COMMAND + 8)
+ 115:../lib/sd_raw.c **** #define R2_COM_CRC_ERR (R1_COM_CRC_ERR + 8)
+ 116:../lib/sd_raw.c **** #define R2_ERASE_SEQ_ERR (R1_ERASE_SEQ_ERR + 8)
+ 117:../lib/sd_raw.c **** #define R2_ADDR_ERR (R1_ADDR_ERR + 8)
+ 118:../lib/sd_raw.c **** #define R2_PARAM_ERR (R1_PARAM_ERR + 8)
+ 119:../lib/sd_raw.c **** /* R3: size 5 bytes */
+ 120:../lib/sd_raw.c **** #define R3_OCR_MASK (0xffffffffUL)
+ 121:../lib/sd_raw.c **** #define R3_IDLE_STATE (R1_IDLE_STATE + 32)
+ 122:../lib/sd_raw.c **** #define R3_ERASE_RESET (R1_ERASE_RESET + 32)
+ 123:../lib/sd_raw.c **** #define R3_ILL_COMMAND (R1_ILL_COMMAND + 32)
+ 124:../lib/sd_raw.c **** #define R3_COM_CRC_ERR (R1_COM_CRC_ERR + 32)
+ 125:../lib/sd_raw.c **** #define R3_ERASE_SEQ_ERR (R1_ERASE_SEQ_ERR + 32)
+ 126:../lib/sd_raw.c **** #define R3_ADDR_ERR (R1_ADDR_ERR + 32)
+ 127:../lib/sd_raw.c **** #define R3_PARAM_ERR (R1_PARAM_ERR + 32)
+ 128:../lib/sd_raw.c **** /* Data Response: size 1 byte */
+ 129:../lib/sd_raw.c **** #define DR_STATUS_MASK 0x0e
+ 130:../lib/sd_raw.c **** #define DR_STATUS_ACCEPTED 0x05
+ 131:../lib/sd_raw.c **** #define DR_STATUS_CRC_ERR 0x0a
+ 132:../lib/sd_raw.c **** #define DR_STATUS_WRITE_ERR 0x0c
+ 133:../lib/sd_raw.c **** 
+ 134:../lib/sd_raw.c **** #if !SD_RAW_SAVE_RAM
+ 135:../lib/sd_raw.c ****     
+ 136:../lib/sd_raw.c ****     /* static data buffer for acceleration */
+ 137:../lib/sd_raw.c ****     static unsigned char raw_block[512];
+ 138:../lib/sd_raw.c ****     /* offset where the data within raw_block lies on the card */
+ 139:../lib/sd_raw.c ****     static unsigned int raw_block_address;
+ 140:../lib/sd_raw.c ****     #if SD_RAW_WRITE_BUFFERING
+ 141:../lib/sd_raw.c ****     /* flag to remember if raw_block was written to the card */
+ 142:../lib/sd_raw.c ****     static unsigned char raw_block_written;
+ 143:../lib/sd_raw.c **** #endif
+ 144:../lib/sd_raw.c **** 
+ 145:../lib/sd_raw.c **** #endif
+ 146:../lib/sd_raw.c **** 
+ 147:../lib/sd_raw.c **** /* private helper functions */
+ 148:../lib/sd_raw.c **** static void sd_raw_send_byte(unsigned char b);
+ 149:../lib/sd_raw.c **** static unsigned char sd_raw_rec_byte(void);
+ 150:../lib/sd_raw.c **** static unsigned char sd_raw_send_command_r1(unsigned char command, unsigned int arg);
+ 151:../lib/sd_raw.c **** //static unsigned short sd_raw_send_command_r2(unsigned char command, unsigned int arg);
+ 152:../lib/sd_raw.c **** 
+ 153:../lib/sd_raw.c **** /**
+ 154:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 155:../lib/sd_raw.c ****  * Initializes memory card communication.
+ 156:../lib/sd_raw.c ****  *
+ 157:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success.
+ 158:../lib/sd_raw.c ****  */
+ 159:../lib/sd_raw.c **** unsigned char sd_raw_init()
+ 160:../lib/sd_raw.c **** {
+ 161:../lib/sd_raw.c ****     /* enable inputs for reading card status */
+ 162:../lib/sd_raw.c ****     /*    configure_pin_available();*/
+ 163:../lib/sd_raw.c ****     /*    configure_pin_locked();*/
+ 164:../lib/sd_raw.c **** 
+ 165:../lib/sd_raw.c ****     /* enable outputs for MOSI, SCK, SS, input for MISO */
+ 166:../lib/sd_raw.c ****     configure_pin_ss();
+ 167:../lib/sd_raw.c ****     configure_pin_mosi();
+ 168:../lib/sd_raw.c ****     configure_pin_miso();
+ 169:../lib/sd_raw.c ****     configure_pin_sck();
+ 170:../lib/sd_raw.c **** 
+ 171:../lib/sd_raw.c ****     unselect_card();
+ 172:../lib/sd_raw.c **** 
+ 173:../lib/sd_raw.c ****     /* initialize SPI with lowest frequency; max. 400kHz during identification mode of card */
+ 174:../lib/sd_raw.c ****     S0SPCCR = 150;  /* Set frequency to 400kHz */
+ 175:../lib/sd_raw.c ****     S0SPCR = 0x38;
+ 176:../lib/sd_raw.c **** 
+ 177:../lib/sd_raw.c **** 
+ 178:../lib/sd_raw.c ****     /* initialization procedure */
+ 179:../lib/sd_raw.c **** 
+ 180:../lib/sd_raw.c ****     if(!sd_raw_available())
+ 181:../lib/sd_raw.c ****     {
+ 182:../lib/sd_raw.c ****         rprintf("SD RAW NOT AVAILABLE\n\r");
+ 183:../lib/sd_raw.c ****         return 0;
+ 184:../lib/sd_raw.c ****     }
+ 185:../lib/sd_raw.c ****     configure_pin_ss();
+ 186:../lib/sd_raw.c ****     unselect_card();
+ 187:../lib/sd_raw.c **** 
+ 188:../lib/sd_raw.c ****     unsigned short i;
+ 189:../lib/sd_raw.c ****     /* card needs 74 cycles minimum to start up */
+ 190:../lib/sd_raw.c ****     for(i = 0; i < 10; ++i)
+ 191:../lib/sd_raw.c ****     {
+ 192:../lib/sd_raw.c ****         /* wait 8 clock cycles */
+ 193:../lib/sd_raw.c ****         sd_raw_rec_byte();
+ 194:../lib/sd_raw.c ****     }
+ 195:../lib/sd_raw.c **** 
+ 196:../lib/sd_raw.c ****     /* address card */
+ 197:../lib/sd_raw.c ****     select_card();
+ 198:../lib/sd_raw.c **** 
+ 199:../lib/sd_raw.c ****     /* reset card */
+ 200:../lib/sd_raw.c ****     unsigned char response;
+ 201:../lib/sd_raw.c ****     for(i = 0; ; ++i)
+ 202:../lib/sd_raw.c ****     {
+ 203:../lib/sd_raw.c ****         response = sd_raw_send_command_r1(CMD_GO_IDLE_STATE, 0);
+ 204:../lib/sd_raw.c ****         if(response == (1 << R1_IDLE_STATE))
+ 205:../lib/sd_raw.c ****             break;
+ 206:../lib/sd_raw.c ****         if(i == 0x1ff)
+ 207:../lib/sd_raw.c ****         {
+ 208:../lib/sd_raw.c ****             rprintf("\n\rresponse: %d\n\r",response);
+ 209:../lib/sd_raw.c ****             unselect_card();
+ 210:../lib/sd_raw.c ****             return 0;
+ 211:../lib/sd_raw.c ****         }
+ 212:../lib/sd_raw.c ****     }
+ 213:../lib/sd_raw.c **** 
+ 214:../lib/sd_raw.c ****     /* wait for card to get ready */
+ 215:../lib/sd_raw.c ****     for(i = 0; ; ++i)
+ 216:../lib/sd_raw.c ****     {
+ 217:../lib/sd_raw.c ****         response = sd_raw_send_command_r1(CMD_SEND_OP_COND, 0);
+ 218:../lib/sd_raw.c ****         if(!(response & (1 << R1_IDLE_STATE)))
+ 219:../lib/sd_raw.c ****             break;
+ 220:../lib/sd_raw.c **** 
+ 221:../lib/sd_raw.c ****         if(i == 0x7fff)
+ 222:../lib/sd_raw.c ****         {
+ 223:../lib/sd_raw.c ****             unselect_card();
+ 224:../lib/sd_raw.c ****             rprintf("i = 0x7fff\n\r");
+ 225:../lib/sd_raw.c ****             return 0;
+ 226:../lib/sd_raw.c ****         }
+ 227:../lib/sd_raw.c ****     }
+ 228:../lib/sd_raw.c **** 
+ 229:../lib/sd_raw.c ****     /* set block size to 512 bytes */
+ 230:../lib/sd_raw.c ****     if(sd_raw_send_command_r1(CMD_SET_BLOCKLEN, 512))
+ 231:../lib/sd_raw.c ****     {
+ 232:../lib/sd_raw.c ****         unselect_card();
+ 233:../lib/sd_raw.c ****         rprintf("BLOCK SIZE SET ERR \n\r");
+ 234:../lib/sd_raw.c ****         return 0;
+ 235:../lib/sd_raw.c ****     }
+ 236:../lib/sd_raw.c **** 
+ 237:../lib/sd_raw.c ****     /* deaddress card */
+ 238:../lib/sd_raw.c ****     unselect_card();
+ 239:../lib/sd_raw.c **** 
+ 240:../lib/sd_raw.c ****     /* switch to highest SPI frequency possible */
+ 241:../lib/sd_raw.c ****     S0SPCCR = 60; /* ~1MHz-- potentially can be faster */
+ 242:../lib/sd_raw.c **** 
+ 243:../lib/sd_raw.c ****     #if !SD_RAW_SAVE_RAM
+ 244:../lib/sd_raw.c ****         /* the first block is likely to be accessed first, so precache it here */
+ 245:../lib/sd_raw.c ****         raw_block_address = 0xffffffff;
+ 246:../lib/sd_raw.c ****         #if SD_RAW_WRITE_BUFFERING
+ 247:../lib/sd_raw.c ****         raw_block_written = 1;
+ 248:../lib/sd_raw.c ****     #endif
+ 249:../lib/sd_raw.c ****     if(!sd_raw_read(0, raw_block, sizeof(raw_block)))
+ 250:../lib/sd_raw.c ****     {
+ 251:../lib/sd_raw.c ****         rprintf("sd_raw_read borks\n\r");
+ 252:../lib/sd_raw.c ****         return 0;
+ 253:../lib/sd_raw.c ****     }
+ 254:../lib/sd_raw.c ****     #endif
+ 255:../lib/sd_raw.c **** 
+ 256:../lib/sd_raw.c ****     return 1;
+ 257:../lib/sd_raw.c **** }
+ 258:../lib/sd_raw.c **** 
+ 259:../lib/sd_raw.c **** /**
+ 260:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 261:../lib/sd_raw.c ****  * Checks wether a memory card is located in the slot.
+ 262:../lib/sd_raw.c ****  *
+ 263:../lib/sd_raw.c ****  * \returns 1 if the card is available, 0 if it is not.
+ 264:../lib/sd_raw.c ****  */
+ 265:../lib/sd_raw.c **** unsigned char sd_raw_available()
+ 266:../lib/sd_raw.c **** {
+  16              		.loc 1 266 0
+  17              		@ Function supports interworking.
+  18              		@ args = 0, pretend = 0, frame = 0
+  19              		@ frame_needed = 0, uses_anonymous_args = 0
+  20              		@ link register save eliminated.
+  21              	.LVL0:
+ 267:../lib/sd_raw.c ****     unsigned int i;
+ 268:../lib/sd_raw.c ****     configure_pin_available();
+  22              		.loc 1 268 0
+  23 0000 44209FE5 		ldr	r2, .L7
+  24 0004 003092E5 		ldr	r3, [r2, #0]
+  25 0008 8030C3E3 		bic	r3, r3, #128
+  26 000c 003082E5 		str	r3, [r2, #0]
+  27              		.loc 1 266 0
+  28              		@ lr needed for prologue
+  29              		.loc 1 268 0
+  30 0010 0020A0E3 		mov	r2, #0
+  31              	.LVL1:
+  32              	.L2:
+ 269:../lib/sd_raw.c ****     for(i=0;i<100000;i++);
+  33              		.loc 1 269 0
+  34 0014 34309FE5 		ldr	r3, .L7+4
+  35 0018 012082E2 		add	r2, r2, #1
+  36 001c 030052E1 		cmp	r2, r3
+  37 0020 0300001A 		bne	.L2
+ 270:../lib/sd_raw.c ****     i = get_pin_available();
+  38              		.loc 1 270 0
+  39 0024 28309FE5 		ldr	r3, .L7+8
+ 271:../lib/sd_raw.c ****     configure_pin_ss();
+  40              		.loc 1 271 0
+  41 0028 1C109FE5 		ldr	r1, .L7
+  42              		.loc 1 270 0
+  43 002c 002093E5 		ldr	r2, [r3, #0]
+  44              	.LVL2:
+  45              		.loc 1 271 0
+  46 0030 003091E5 		ldr	r3, [r1, #0]
+  47 0034 800012E3 		tst	r2, #128
+  48 0038 803083E3 		orr	r3, r3, #128
+ 272:../lib/sd_raw.c ****     return i == 0x00;
+ 273:../lib/sd_raw.c **** }
+  49              		.loc 1 273 0
+  50 003c 0000A003 		moveq	r0, #0
+  51 0040 0100A013 		movne	r0, #1
+  52              		.loc 1 271 0
+  53 0044 003081E5 		str	r3, [r1, #0]
+  54              		.loc 1 273 0
+  55 0048 1EFF2FE1 		bx	lr
+  56              	.L8:
+  57              		.align	2
+  58              	.L7:
+  59 004c 088002E0 		.word	-536707064
+  60 0050 A0860100 		.word	100000
+  61 0054 008002E0 		.word	-536707072
+  62              	.LFE3:
+  64              		.align	2
+  66              	sd_raw_rec_byte:
+  67              	.LFB6:
+ 274:../lib/sd_raw.c **** 
+ 275:../lib/sd_raw.c **** /**
+ 276:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 277:../lib/sd_raw.c ****  * Checks wether the memory card is locked for write access.
+ 278:../lib/sd_raw.c ****  *
+ 279:../lib/sd_raw.c ****  * \returns 1 if the card is locked, 0 if it is not.
+ 280:../lib/sd_raw.c ****  */
+ 281:../lib/sd_raw.c **** unsigned char sd_raw_locked()
+ 282:../lib/sd_raw.c **** {
+ 283:../lib/sd_raw.c ****     return get_pin_locked() == 0x00;
+ 284:../lib/sd_raw.c **** }
+ 285:../lib/sd_raw.c **** 
+ 286:../lib/sd_raw.c **** /**
+ 287:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 288:../lib/sd_raw.c ****  * Sends a raw byte to the memory card.
+ 289:../lib/sd_raw.c ****  *
+ 290:../lib/sd_raw.c ****  * \param[in] b The byte to sent.
+ 291:../lib/sd_raw.c ****  * \see sd_raw_rec_byte
+ 292:../lib/sd_raw.c ****  */
+ 293:../lib/sd_raw.c **** void sd_raw_send_byte(unsigned char b)
+ 294:../lib/sd_raw.c **** {
+ 295:../lib/sd_raw.c ****     S0SPDR = b;
+ 296:../lib/sd_raw.c ****     /* wait for byte to be shifted out */
+ 297:../lib/sd_raw.c ****     while(!(S0SPSR & 0x80));
+ 298:../lib/sd_raw.c **** }
+ 299:../lib/sd_raw.c **** 
+ 300:../lib/sd_raw.c **** /**
+ 301:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 302:../lib/sd_raw.c ****  * Receives a raw byte from the memory card.
+ 303:../lib/sd_raw.c ****  *
+ 304:../lib/sd_raw.c ****  * \returns The byte which should be read.
+ 305:../lib/sd_raw.c ****  * \see sd_raw_send_byte
+ 306:../lib/sd_raw.c ****  */
+ 307:../lib/sd_raw.c **** unsigned char sd_raw_rec_byte(void)
+ 308:../lib/sd_raw.c **** {
+  68              		.loc 1 308 0
+  69              		@ Function supports interworking.
+  70              		@ args = 0, pretend = 0, frame = 0
+  71              		@ frame_needed = 0, uses_anonymous_args = 0
+  72              		@ link register save eliminated.
+  73              	.LVL3:
+ 309:../lib/sd_raw.c ****     /* send dummy data for receiving some */
+ 310:../lib/sd_raw.c ****     S0SPDR = 0xff;
+  74              		.loc 1 310 0
+  75 0058 24309FE5 		ldr	r3, .L15
+  76 005c FF20A0E3 		mov	r2, #255
+  77 0060 002083E5 		str	r2, [r3, #0]
+  78              		.loc 1 308 0
+  79              		@ lr needed for prologue
+  80              	.L10:
+ 311:../lib/sd_raw.c ****     while(!(S0SPSR & 0x80));
+  81              		.loc 1 311 0
+  82 0064 1C309FE5 		ldr	r3, .L15+4
+  83 0068 003093E5 		ldr	r3, [r3, #0]
+  84 006c 800013E3 		tst	r3, #128
+  85 0070 1700000A 		beq	.L10
+ 312:../lib/sd_raw.c **** 
+ 313:../lib/sd_raw.c ****     return S0SPDR;
+  86              		.loc 1 313 0
+  87 0074 08309FE5 		ldr	r3, .L15
+  88 0078 000093E5 		ldr	r0, [r3, #0]
+  89 007c FF0000E2 		and	r0, r0, #255
+ 314:../lib/sd_raw.c **** }
+  90              		.loc 1 314 0
+  91 0080 1EFF2FE1 		bx	lr
+  92              	.L16:
+  93              		.align	2
+  94              	.L15:
+  95 0084 080002E0 		.word	-536739832
+  96 0088 040002E0 		.word	-536739836
+  97              	.LFE6:
+  99              		.align	2
+ 100              		.global	sd_raw_locked
+ 102              	sd_raw_locked:
+ 103              	.LFB4:
+ 104              		.loc 1 282 0
+ 105              		@ Function supports interworking.
+ 106              		@ args = 0, pretend = 0, frame = 0
+ 107              		@ frame_needed = 0, uses_anonymous_args = 0
+ 108              		@ link register save eliminated.
+ 109              	.LVL4:
+ 110              		.loc 1 284 0
+ 111 008c 0100A0E3 		mov	r0, #1
+ 112              		.loc 1 282 0
+ 113              		@ lr needed for prologue
+ 114              		.loc 1 284 0
+ 115 0090 1EFF2FE1 		bx	lr
+ 116              	.LFE4:
+ 118              		.align	2
+ 120              	sd_raw_send_byte:
+ 121              	.LFB5:
+ 122              		.loc 1 294 0
+ 123              		@ Function supports interworking.
+ 124              		@ args = 0, pretend = 0, frame = 0
+ 125              		@ frame_needed = 0, uses_anonymous_args = 0
+ 126              		@ link register save eliminated.
+ 127              	.LVL5:
+ 128              		.loc 1 295 0
+ 129 0094 18309FE5 		ldr	r3, .L25
+ 130              		.loc 1 294 0
+ 131 0098 FF0000E2 		and	r0, r0, #255
+ 132              		.loc 1 295 0
+ 133 009c 000083E5 		str	r0, [r3, #0]
+ 134              		.loc 1 294 0
+ 135              		@ lr needed for prologue
+ 136              	.L20:
+ 137              		.loc 1 297 0
+ 138 00a0 10309FE5 		ldr	r3, .L25+4
+ 139 00a4 003093E5 		ldr	r3, [r3, #0]
+ 140 00a8 800013E3 		tst	r3, #128
+ 141 00ac 2600000A 		beq	.L20
+ 142              		.loc 1 298 0
+ 143 00b0 1EFF2FE1 		bx	lr
+ 144              	.L26:
+ 145              		.align	2
+ 146              	.L25:
+ 147 00b4 080002E0 		.word	-536739832
+ 148 00b8 040002E0 		.word	-536739836
+ 149              	.LFE5:
+ 151              		.align	2
+ 153              	sd_raw_send_command_r1:
+ 154              	.LFB7:
+ 315:../lib/sd_raw.c **** 
+ 316:../lib/sd_raw.c **** /**
+ 317:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 318:../lib/sd_raw.c ****  * Send a command to the memory card which responses with a R1 response.
+ 319:../lib/sd_raw.c ****  *
+ 320:../lib/sd_raw.c ****  * \param[in] command The command to send.
+ 321:../lib/sd_raw.c ****  * \param[in] arg The argument for command.
+ 322:../lib/sd_raw.c ****  * \returns The command answer.
+ 323:../lib/sd_raw.c ****  */
+ 324:../lib/sd_raw.c **** unsigned char sd_raw_send_command_r1(unsigned char command, unsigned int arg)
+ 325:../lib/sd_raw.c **** {
+ 155              		.loc 1 325 0
+ 156              		@ Function supports interworking.
+ 157              		@ args = 0, pretend = 0, frame = 0
+ 158              		@ frame_needed = 0, uses_anonymous_args = 0
+ 159              	.LVL6:
+ 160 00bc 30402DE9 		stmfd	sp!, {r4, r5, lr}
+ 161              	.LCFI0:
+ 162              		.loc 1 325 0
+ 163 00c0 FF5000E2 		and	r5, r0, #255
+ 164 00c4 0140A0E1 		mov	r4, r1
+ 326:../lib/sd_raw.c ****     unsigned char response;
+ 327:../lib/sd_raw.c ****     unsigned char i;
+ 328:../lib/sd_raw.c **** 
+ 329:../lib/sd_raw.c ****     /* wait some clock cycles */
+ 330:../lib/sd_raw.c ****     sd_raw_rec_byte();
+ 165              		.loc 1 330 0
+ 166 00c8 140000EB 		bl	sd_raw_rec_byte
+ 167              	.LVL7:
+ 331:../lib/sd_raw.c **** 
+ 332:../lib/sd_raw.c ****     /* send command via SPI */
+ 333:../lib/sd_raw.c ****     sd_raw_send_byte(0x40 | command);
+ 168              		.loc 1 333 0
+ 169 00cc 400085E3 		orr	r0, r5, #64
+ 170 00d0 230000EB 		bl	sd_raw_send_byte
+ 334:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 24) & 0xff);
+ 171              		.loc 1 334 0
+ 172 00d4 240CA0E1 		mov	r0, r4, lsr #24
+ 173 00d8 230000EB 		bl	sd_raw_send_byte
+ 335:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 16) & 0xff);
+ 174              		.loc 1 335 0
+ 175 00dc 2408A0E1 		mov	r0, r4, lsr #16
+ 176 00e0 FF0000E2 		and	r0, r0, #255
+ 177 00e4 230000EB 		bl	sd_raw_send_byte
+ 336:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 8) & 0xff);
+ 178              		.loc 1 336 0
+ 179 00e8 2404A0E1 		mov	r0, r4, lsr #8
+ 180 00ec FF0000E2 		and	r0, r0, #255
+ 337:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 0) & 0xff);
+ 181              		.loc 1 337 0
+ 182 00f0 FF4004E2 		and	r4, r4, #255
+ 183              	.LVL8:
+ 184              		.loc 1 336 0
+ 185 00f4 230000EB 		bl	sd_raw_send_byte
+ 186              		.loc 1 337 0
+ 187 00f8 0400A0E1 		mov	r0, r4
+ 188 00fc 230000EB 		bl	sd_raw_send_byte
+ 338:../lib/sd_raw.c ****     sd_raw_send_byte((command == CMD_GO_IDLE_STATE) ? 0x95 : 0xff);
+ 189              		.loc 1 338 0
+ 190 0100 000055E3 		cmp	r5, #0
+ 191 0104 FF00A013 		movne	r0, #255
+ 192 0108 9500A003 		moveq	r0, #149
+ 193 010c 230000EB 		bl	sd_raw_send_byte
+ 194 0110 0A40A0E3 		mov	r4, #10
+ 195              	.L31:
+ 339:../lib/sd_raw.c **** 
+ 340:../lib/sd_raw.c ****     /* receive response */
+ 341:../lib/sd_raw.c ****     for(i = 0; i < 10; ++i)
+ 342:../lib/sd_raw.c ****     {
+ 343:../lib/sd_raw.c ****         response = sd_raw_rec_byte();
+ 196              		.loc 1 343 0
+ 197 0114 140000EB 		bl	sd_raw_rec_byte
+ 344:../lib/sd_raw.c ****         if(response != 0xff)
+ 198              		.loc 1 344 0
+ 199 0118 FF0050E3 		cmp	r0, #255
+ 345:../lib/sd_raw.c ****             break;
+ 200              		.loc 1 345 0
+ 201 011c 013044E2 		sub	r3, r4, #1
+ 202              		.loc 1 344 0
+ 203 0120 4900001A 		bne	.L32
+ 204              		.loc 1 341 0
+ 205 0124 FF4013E2 		ands	r4, r3, #255
+ 206 0128 4300001A 		bne	.L31
+ 207              	.L32:
+ 346:../lib/sd_raw.c ****     }
+ 347:../lib/sd_raw.c **** 
+ 348:../lib/sd_raw.c ****     return response;
+ 349:../lib/sd_raw.c **** }
+ 208              		.loc 1 349 0
+ 209 012c 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 210 0130 1EFF2FE1 		bx	lr
+ 211              	.LFE7:
+ 213              		.align	2
+ 214              		.global	sd_raw_read
+ 216              	sd_raw_read:
+ 217              	.LFB8:
+ 350:../lib/sd_raw.c **** 
+ 351:../lib/sd_raw.c **** /**
+ 352:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 353:../lib/sd_raw.c ****  * Send a command to the memory card which responses with a R2 response.
+ 354:../lib/sd_raw.c ****  *
+ 355:../lib/sd_raw.c ****  * \param[in] command The command to send.
+ 356:../lib/sd_raw.c ****  * \param[in] arg The argument for command.
+ 357:../lib/sd_raw.c ****  * \returns The command answer.
+ 358:../lib/sd_raw.c ****  */
+ 359:../lib/sd_raw.c **** /*
+ 360:../lib/sd_raw.c **** unsigned short sd_raw_send_command_r2(unsigned char command, unsigned int arg)
+ 361:../lib/sd_raw.c **** {
+ 362:../lib/sd_raw.c ****     unsigned short response;
+ 363:../lib/sd_raw.c ****     unsigned char i;
+ 364:../lib/sd_raw.c **** 
+ 365:../lib/sd_raw.c ****     // wait some clock cycles
+ 366:../lib/sd_raw.c ****     sd_raw_rec_byte();
+ 367:../lib/sd_raw.c **** 
+ 368:../lib/sd_raw.c ****     // send command via SPI
+ 369:../lib/sd_raw.c ****     sd_raw_send_byte(0x40 | command);
+ 370:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 24) & 0xff);
+ 371:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 16) & 0xff);
+ 372:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 8) & 0xff);
+ 373:../lib/sd_raw.c ****     sd_raw_send_byte((arg >> 0) & 0xff);
+ 374:../lib/sd_raw.c ****     sd_raw_send_byte(command == CMD_GO_IDLE_STATE ? 0x95 : 0xff);
+ 375:../lib/sd_raw.c **** 
+ 376:../lib/sd_raw.c ****     // receive response
+ 377:../lib/sd_raw.c ****     for(i = 0; i < 10; ++i)
+ 378:../lib/sd_raw.c ****     {
+ 379:../lib/sd_raw.c ****         response = sd_raw_rec_byte();
+ 380:../lib/sd_raw.c ****         if(response != 0xff)
+ 381:../lib/sd_raw.c ****             break;
+ 382:../lib/sd_raw.c ****     }
+ 383:../lib/sd_raw.c ****     response <<= 8;
+ 384:../lib/sd_raw.c ****     response |= sd_raw_rec_byte();
+ 385:../lib/sd_raw.c **** 
+ 386:../lib/sd_raw.c ****     return response;
+ 387:../lib/sd_raw.c **** }
+ 388:../lib/sd_raw.c **** */
+ 389:../lib/sd_raw.c **** 
+ 390:../lib/sd_raw.c **** /**
+ 391:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 392:../lib/sd_raw.c ****  * Reads raw data from the card.
+ 393:../lib/sd_raw.c ****  *
+ 394:../lib/sd_raw.c ****  * \param[in] offset The offset from which to read.
+ 395:../lib/sd_raw.c ****  * \param[out] buffer The buffer into which to write the data.
+ 396:../lib/sd_raw.c ****  * \param[in] length The number of bytes to read.
+ 397:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success.
+ 398:../lib/sd_raw.c ****  * \see sd_raw_read_interval, sd_raw_write
+ 399:../lib/sd_raw.c ****  */
+ 400:../lib/sd_raw.c **** unsigned char sd_raw_read(unsigned int offset, unsigned char* buffer, unsigned short length)
+ 401:../lib/sd_raw.c **** {
+ 218              		.loc 1 401 0
+ 219              		@ Function supports interworking.
+ 220              		@ args = 0, pretend = 0, frame = 0
+ 221              		@ frame_needed = 0, uses_anonymous_args = 0
+ 222              	.LVL9:
+ 223 0134 F0472DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 224              	.LCFI1:
+ 225              		.loc 1 401 0
+ 226 0138 0228A0E1 		mov	r2, r2, asl #16
+ 227              	.LVL10:
+ 228 013c 0090A0E1 		mov	r9, r0
+ 229 0140 01A0A0E1 		mov	sl, r1
+ 230 0144 2288A0E1 		mov	r8, r2, lsr #16
+ 231              	.LVL11:
+ 232 0148 990000EA 		b	.L38
+ 233              	.LVL12:
+ 234              	.L39:
+ 402:../lib/sd_raw.c ****     unsigned int block_address;
+ 403:../lib/sd_raw.c ****     unsigned short block_offset;
+ 404:../lib/sd_raw.c ****     unsigned short read_length;
+ 405:../lib/sd_raw.c ****     while(length > 0)
+ 406:../lib/sd_raw.c ****     {
+ 407:../lib/sd_raw.c ****         /* determine byte count to read at once */
+ 408:../lib/sd_raw.c ****         block_address = offset & 0xfffffe00;
+ 409:../lib/sd_raw.c ****         block_offset = offset & 0x01ff;
+ 235              		.loc 1 409 0
+ 236 014c 897BA0E1 		mov	r7, r9, asl #23
+ 237 0150 A77BA0E1 		mov	r7, r7, lsr #23
+ 410:../lib/sd_raw.c ****         read_length = 512 - block_offset; /* read up to block border */
+ 411:../lib/sd_raw.c ****         if(read_length > length)
+ 412:../lib/sd_raw.c ****             read_length = length;
+ 413:../lib/sd_raw.c **** 
+ 414:../lib/sd_raw.c ****         #if !SD_RAW_SAVE_RAM
+ 415:../lib/sd_raw.c ****             /* check if the requested data is cached */
+ 416:../lib/sd_raw.c ****             if(block_address != raw_block_address)
+ 238              		.loc 1 416 0
+ 239 0154 24319FE5 		ldr	r3, .L61
+ 240              		.loc 1 410 0
+ 241 0158 022C67E2 		rsb	r2, r7, #512
+ 242 015c 0228A0E1 		mov	r2, r2, asl #16
+ 243              		.loc 1 416 0
+ 244 0160 000093E5 		ldr	r0, [r3, #0]
+ 245              		.loc 1 408 0
+ 246 0164 7F6FC9E3 		bic	r6, r9, #508
+ 247 0168 0360C6E3 		bic	r6, r6, #3
+ 248              		.loc 1 410 0
+ 249 016c 2258A0E1 		mov	r5, r2, lsr #16
+ 250              		.loc 1 411 0
+ 251 0170 080055E1 		cmp	r5, r8
+ 252 0174 0850A021 		movcs	r5, r8
+ 253              		.loc 1 416 0
+ 254 0178 000056E1 		cmp	r6, r0
+ 255 017c 9000000A 		beq	.L42
+ 256              	.LBB2:
+ 417:../lib/sd_raw.c ****             #endif
+ 418:../lib/sd_raw.c ****         {
+ 419:../lib/sd_raw.c ****             #if SD_RAW_WRITE_BUFFERING
+ 420:../lib/sd_raw.c ****                 if(!raw_block_written)
+ 257              		.loc 1 420 0
+ 258 0180 FC309FE5 		ldr	r3, .L61+4
+ 259 0184 0030D3E5 		ldrb	r3, [r3, #0]	@ zero_extendqisi2
+ 260 0188 000053E3 		cmp	r3, #0
+ 261 018c 6700001A 		bne	.L44
+ 421:../lib/sd_raw.c ****                 {
+ 422:../lib/sd_raw.c ****                     if(!sd_raw_write(raw_block_address, raw_block, sizeof(raw_block)))
+ 262              		.loc 1 422 0
+ 263 0190 F0109FE5 		ldr	r1, .L61+8
+ 264 0194 022CA0E3 		mov	r2, #512
+ 265 0198 FEFFFFEB 		bl	sd_raw_write
+ 266 019c 000050E3 		cmp	r0, #0
+ 267 01a0 9C00000A 		beq	.L47
+ 268              	.LVL13:
+ 269              	.L44:
+ 423:../lib/sd_raw.c ****                         return 0;
+ 424:../lib/sd_raw.c ****                 }
+ 425:../lib/sd_raw.c ****             #endif
+ 426:../lib/sd_raw.c **** 
+ 427:../lib/sd_raw.c ****             /* address card */
+ 428:../lib/sd_raw.c ****             select_card();
+ 270              		.loc 1 428 0
+ 271 01a4 E0209FE5 		ldr	r2, .L61+12
+ 272 01a8 003092E5 		ldr	r3, [r2, #0]
+ 273 01ac 803083E3 		orr	r3, r3, #128
+ 429:../lib/sd_raw.c **** 
+ 430:../lib/sd_raw.c ****             /* send single block request */
+ 431:../lib/sd_raw.c ****             if(sd_raw_send_command_r1(CMD_READ_SINGLE_BLOCK, block_address))
+ 274              		.loc 1 431 0
+ 275 01b0 1100A0E3 		mov	r0, #17
+ 276 01b4 0610A0E1 		mov	r1, r6
+ 277              		.loc 1 428 0
+ 278 01b8 003082E5 		str	r3, [r2, #0]
+ 279              		.loc 1 431 0
+ 280 01bc 2D0000EB 		bl	sd_raw_send_command_r1
+ 281 01c0 000050E3 		cmp	r0, #0
+ 282 01c4 7600000A 		beq	.L56
+ 432:../lib/sd_raw.c ****             {
+ 433:../lib/sd_raw.c ****                 unselect_card();
+ 283              		.loc 1 433 0
+ 284 01c8 C0209FE5 		ldr	r2, .L61+16
+ 285 01cc 003092E5 		ldr	r3, [r2, #0]
+ 286 01d0 0000A0E3 		mov	r0, #0
+ 287 01d4 803083E3 		orr	r3, r3, #128
+ 288 01d8 003082E5 		str	r3, [r2, #0]
+ 289 01dc 9C0000EA 		b	.L47
+ 290              	.L56:
+ 434:../lib/sd_raw.c ****                 return 0;
+ 435:../lib/sd_raw.c ****             }
+ 436:../lib/sd_raw.c **** 
+ 437:../lib/sd_raw.c ****             /* wait for data block (start byte 0xfe) */
+ 438:../lib/sd_raw.c ****             while(sd_raw_rec_byte() != 0xfe);
+ 291              		.loc 1 438 0
+ 292 01e0 140000EB 		bl	sd_raw_rec_byte
+ 293 01e4 FE0050E3 		cmp	r0, #254
+ 294 01e8 7600001A 		bne	.L56
+ 295 01ec A0409FE5 		ldr	r4, .L61+20
+ 296              	.L51:
+ 439:../lib/sd_raw.c **** 
+ 440:../lib/sd_raw.c ****             #if SD_RAW_SAVE_RAM
+ 441:../lib/sd_raw.c ****                 /* read byte block */
+ 442:../lib/sd_raw.c ****                 unsigned short read_to = block_offset + read_length;
+ 443:../lib/sd_raw.c ****                 for(unsigned short i = 0; i < 512; ++i)
+ 444:../lib/sd_raw.c ****                 {
+ 445:../lib/sd_raw.c ****                     unsigned char b = sd_raw_rec_byte();
+ 446:../lib/sd_raw.c ****                     if(i >= block_offset && i < read_to)
+ 447:../lib/sd_raw.c ****                         *buffer++ = b;
+ 448:../lib/sd_raw.c ****                 }
+ 449:../lib/sd_raw.c ****             #else
+ 450:../lib/sd_raw.c ****                 /* read byte block */
+ 451:../lib/sd_raw.c ****                 unsigned char* cache = raw_block;
+ 452:../lib/sd_raw.c ****                 unsigned short i;
+ 453:../lib/sd_raw.c ****                 for(i = 0; i < 512; ++i)
+ 454:../lib/sd_raw.c ****                     *cache++ = sd_raw_rec_byte();
+ 297              		.loc 1 454 0
+ 298 01f0 140000EB 		bl	sd_raw_rec_byte
+ 299              		.loc 1 453 0
+ 300 01f4 9C309FE5 		ldr	r3, .L61+24
+ 301              		.loc 1 454 0
+ 302 01f8 010044E5 		strb	r0, [r4, #-1]
+ 303 01fc 014084E2 		add	r4, r4, #1
+ 304              		.loc 1 453 0
+ 305 0200 030054E1 		cmp	r4, r3
+ 306 0204 7A00001A 		bne	.L51
+ 455:../lib/sd_raw.c ****                 raw_block_address = block_address;
+ 307              		.loc 1 455 0
+ 308 0208 70309FE5 		ldr	r3, .L61
+ 456:../lib/sd_raw.c ****     
+ 457:../lib/sd_raw.c ****                 memcpy(buffer, raw_block + block_offset, read_length);
+ 309              		.loc 1 457 0
+ 310 020c 74109FE5 		ldr	r1, .L61+8
+ 311 0210 0520A0E1 		mov	r2, r5
+ 312              		.loc 1 455 0
+ 313 0214 006083E5 		str	r6, [r3, #0]
+ 314              		.loc 1 457 0
+ 315 0218 011087E0 		add	r1, r7, r1
+ 316 021c 0A00A0E1 		mov	r0, sl
+ 317 0220 FEFFFFEB 		bl	memcpy
+ 458:../lib/sd_raw.c ****                 buffer += read_length;
+ 459:../lib/sd_raw.c ****             #endif
+ 460:../lib/sd_raw.c **** 
+ 461:../lib/sd_raw.c ****             /* read crc16 */
+ 462:../lib/sd_raw.c ****             sd_raw_rec_byte();
+ 318              		.loc 1 462 0
+ 319 0224 140000EB 		bl	sd_raw_rec_byte
+ 463:../lib/sd_raw.c ****             sd_raw_rec_byte();
+ 320              		.loc 1 463 0
+ 321 0228 140000EB 		bl	sd_raw_rec_byte
+ 464:../lib/sd_raw.c **** 
+ 465:../lib/sd_raw.c ****             /* deaddress card */
+ 466:../lib/sd_raw.c ****             unselect_card();
+ 322              		.loc 1 466 0
+ 323 022c 5C209FE5 		ldr	r2, .L61+16
+ 324 0230 003092E5 		ldr	r3, [r2, #0]
+ 325 0234 803083E3 		orr	r3, r3, #128
+ 326 0238 003082E5 		str	r3, [r2, #0]
+ 327              		.loc 1 458 0
+ 328 023c 05A08AE0 		add	sl, sl, r5
+ 467:../lib/sd_raw.c **** 
+ 468:../lib/sd_raw.c ****             /* let card some time to finish */
+ 469:../lib/sd_raw.c ****             sd_raw_rec_byte();
+ 329              		.loc 1 469 0
+ 330 0240 140000EB 		bl	sd_raw_rec_byte
+ 331 0244 950000EA 		b	.L53
+ 332              	.LVL14:
+ 333              	.L42:
+ 334              	.LBE2:
+ 470:../lib/sd_raw.c ****         }
+ 471:../lib/sd_raw.c ****         #if !SD_RAW_SAVE_RAM
+ 472:../lib/sd_raw.c ****             else
+ 473:../lib/sd_raw.c ****             {
+ 474:../lib/sd_raw.c ****                 /* use cached data */
+ 475:../lib/sd_raw.c ****                 memcpy(buffer, raw_block + block_offset, read_length);
+ 335              		.loc 1 475 0
+ 336 0248 38109FE5 		ldr	r1, .L61+8
+ 337 024c 0A00A0E1 		mov	r0, sl
+ 338 0250 011087E0 		add	r1, r7, r1
+ 339 0254 0520A0E1 		mov	r2, r5
+ 340 0258 FEFFFFEB 		bl	memcpy
+ 341              	.L53:
+ 476:../lib/sd_raw.c ****             }
+ 477:../lib/sd_raw.c ****         #endif
+ 478:../lib/sd_raw.c **** 
+ 479:../lib/sd_raw.c ****         length -= read_length;
+ 342              		.loc 1 479 0
+ 343 025c 083065E0 		rsb	r3, r5, r8
+ 344 0260 0338A0E1 		mov	r3, r3, asl #16
+ 480:../lib/sd_raw.c ****         offset += read_length;
+ 345              		.loc 1 480 0
+ 346 0264 059089E0 		add	r9, r9, r5
+ 347              		.loc 1 479 0
+ 348 0268 2388A0E1 		mov	r8, r3, lsr #16
+ 349              	.LVL15:
+ 350              	.L38:
+ 351              		.loc 1 405 0
+ 352 026c 000058E3 		cmp	r8, #0
+ 353 0270 5100001A 		bne	.L39
+ 354 0274 0100A0E3 		mov	r0, #1
+ 355              	.L47:
+ 481:../lib/sd_raw.c ****     }
+ 482:../lib/sd_raw.c **** 
+ 483:../lib/sd_raw.c ****     return 1;
+ 484:../lib/sd_raw.c **** }
+ 356              		.loc 1 484 0
+ 357 0278 F047BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 358 027c 1EFF2FE1 		bx	lr
+ 359              	.L62:
+ 360              		.align	2
+ 361              	.L61:
+ 362 0280 04000000 		.word	raw_block_address
+ 363 0284 00000000 		.word	raw_block_written
+ 364 0288 08000000 		.word	raw_block
+ 365 028c 0C8002E0 		.word	-536707060
+ 366 0290 048002E0 		.word	-536707068
+ 367 0294 09000000 		.word	raw_block+1
+ 368 0298 09020000 		.word	raw_block+513
+ 369              	.LFE8:
+ 371              		.align	2
+ 372              		.global	sd_raw_write
+ 374              	sd_raw_write:
+ 375              	.LFB10:
+ 485:../lib/sd_raw.c **** 
+ 486:../lib/sd_raw.c **** /**
+ 487:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 488:../lib/sd_raw.c ****  * Continuously reads units of \c interval bytes and calls a callback function.
+ 489:../lib/sd_raw.c ****  *
+ 490:../lib/sd_raw.c ****  * This function starts reading at the specified offset. Every \c interval bytes,
+ 491:../lib/sd_raw.c ****  * it calls the callback function with the associated data buffer.
+ 492:../lib/sd_raw.c ****  *
+ 493:../lib/sd_raw.c ****  * By returning zero, the callback may stop reading.
+ 494:../lib/sd_raw.c ****  *
+ 495:../lib/sd_raw.c ****  * \note Within the callback function, you can not start another read or
+ 496:../lib/sd_raw.c ****  *       write operation.
+ 497:../lib/sd_raw.c ****  * \note This function only works if the following conditions are met:
+ 498:../lib/sd_raw.c ****  *       - (offset - (offset % 512)) % interval == 0
+ 499:../lib/sd_raw.c ****  *       - length % interval == 0
+ 500:../lib/sd_raw.c ****  *
+ 501:../lib/sd_raw.c ****  * \param[in] offset Offset from which to start reading.
+ 502:../lib/sd_raw.c ****  * \param[in] buffer Pointer to a buffer which is at least interval bytes in size.
+ 503:../lib/sd_raw.c ****  * \param[in] interval Number of bytes to read before calling the callback function.
+ 504:../lib/sd_raw.c ****  * \param[in] length Number of bytes to read altogether.
+ 505:../lib/sd_raw.c ****  * \param[in] callback The function to call every interval bytes.
+ 506:../lib/sd_raw.c ****  * \param[in] p An opaque pointer directly passed to the callback function.
+ 507:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success
+ 508:../lib/sd_raw.c ****  * \see sd_raw_read, sd_raw_write
+ 509:../lib/sd_raw.c ****  */
+ 510:../lib/sd_raw.c **** unsigned char sd_raw_read_interval(unsigned int offset, unsigned char* buffer, unsigned short inter
+ 511:../lib/sd_raw.c **** {
+ 512:../lib/sd_raw.c ****     if(!buffer || interval == 0 || length < interval || !callback)
+ 513:../lib/sd_raw.c ****         return 0;
+ 514:../lib/sd_raw.c **** 
+ 515:../lib/sd_raw.c ****     #if !SD_RAW_SAVE_RAM
+ 516:../lib/sd_raw.c ****         while(length >= interval)
+ 517:../lib/sd_raw.c ****         {
+ 518:../lib/sd_raw.c ****             /* as reading is now buffered, we directly
+ 519:../lib/sd_raw.c ****                      * hand over the request to sd_raw_read()
+ 520:../lib/sd_raw.c ****                      */
+ 521:../lib/sd_raw.c ****             if(!sd_raw_read(offset, buffer, interval))
+ 522:../lib/sd_raw.c ****                 return 0;
+ 523:../lib/sd_raw.c ****             if(!callback(buffer, offset, p))
+ 524:../lib/sd_raw.c ****                 break;
+ 525:../lib/sd_raw.c ****             offset += interval;
+ 526:../lib/sd_raw.c ****             length -= interval;
+ 527:../lib/sd_raw.c ****         }
+ 528:../lib/sd_raw.c ****     
+ 529:../lib/sd_raw.c ****         return 1;
+ 530:../lib/sd_raw.c ****     #else
+ 531:../lib/sd_raw.c ****         /* address card */
+ 532:../lib/sd_raw.c ****         select_card();
+ 533:../lib/sd_raw.c ****     
+ 534:../lib/sd_raw.c ****         unsigned short block_offset;
+ 535:../lib/sd_raw.c ****         unsigned short read_length;
+ 536:../lib/sd_raw.c ****         unsigned char* buffer_cur;
+ 537:../lib/sd_raw.c ****         unsigned char finished = 0;
+ 538:../lib/sd_raw.c ****         do
+ 539:../lib/sd_raw.c ****         {
+ 540:../lib/sd_raw.c ****             /* determine byte count to read at once */
+ 541:../lib/sd_raw.c ****             block_offset = offset & 0x01ff;
+ 542:../lib/sd_raw.c ****             read_length = 512 - block_offset;
+ 543:../lib/sd_raw.c ****     
+ 544:../lib/sd_raw.c ****             /* send single block request */
+ 545:../lib/sd_raw.c ****             if(sd_raw_send_command_r1(CMD_READ_SINGLE_BLOCK, offset & 0xfffffe00))
+ 546:../lib/sd_raw.c ****             {
+ 547:../lib/sd_raw.c ****                 unselect_card();
+ 548:../lib/sd_raw.c ****                 return 0;
+ 549:../lib/sd_raw.c ****             }
+ 550:../lib/sd_raw.c ****     
+ 551:../lib/sd_raw.c ****             /* wait for data block (start byte 0xfe) */
+ 552:../lib/sd_raw.c ****             while(sd_raw_rec_byte() != 0xfe);
+ 553:../lib/sd_raw.c ****             unsigned short i;
+ 554:../lib/sd_raw.c ****             /* read up to the data of interest */
+ 555:../lib/sd_raw.c ****             for(i = 0; i < block_offset; ++i)
+ 556:../lib/sd_raw.c ****                 sd_raw_rec_byte();
+ 557:../lib/sd_raw.c ****     
+ 558:../lib/sd_raw.c ****             /* read interval bytes of data and execute the callback */
+ 559:../lib/sd_raw.c ****             do
+ 560:../lib/sd_raw.c ****             {
+ 561:../lib/sd_raw.c ****                 if(read_length < interval || length < interval)
+ 562:../lib/sd_raw.c ****                     break;
+ 563:../lib/sd_raw.c ****     
+ 564:../lib/sd_raw.c ****                 buffer_cur = buffer;
+ 565:../lib/sd_raw.c ****                 for(i = 0; i < interval; ++i)
+ 566:../lib/sd_raw.c ****                     *buffer_cur++ = sd_raw_rec_byte();
+ 567:../lib/sd_raw.c ****     
+ 568:../lib/sd_raw.c ****                 if(!callback(buffer, offset + (512 - read_length), p))
+ 569:../lib/sd_raw.c ****                 {
+ 570:../lib/sd_raw.c ****                     finished = 1;
+ 571:../lib/sd_raw.c ****                     break;
+ 572:../lib/sd_raw.c ****                 }
+ 573:../lib/sd_raw.c ****     
+ 574:../lib/sd_raw.c ****                 read_length -= interval;
+ 575:../lib/sd_raw.c ****                 length -= interval;
+ 576:../lib/sd_raw.c ****     
+ 577:../lib/sd_raw.c ****             }
+ 578:../lib/sd_raw.c ****             while(read_length > 0 && length > 0);
+ 579:../lib/sd_raw.c ****     
+ 580:../lib/sd_raw.c ****             /* read rest of data block */
+ 581:../lib/sd_raw.c ****             while(read_length-- > 0)
+ 582:../lib/sd_raw.c ****                 sd_raw_rec_byte();
+ 583:../lib/sd_raw.c ****     
+ 584:../lib/sd_raw.c ****             /* read crc16 */
+ 585:../lib/sd_raw.c ****             sd_raw_rec_byte();
+ 586:../lib/sd_raw.c ****             sd_raw_rec_byte();
+ 587:../lib/sd_raw.c ****     
+ 588:../lib/sd_raw.c ****             if(length < interval)
+ 589:../lib/sd_raw.c ****                 break;
+ 590:../lib/sd_raw.c ****     
+ 591:../lib/sd_raw.c ****             offset = (offset & 0xfffffe00) + 512;
+ 592:../lib/sd_raw.c ****     
+ 593:../lib/sd_raw.c ****         }
+ 594:../lib/sd_raw.c ****         while(!finished);
+ 595:../lib/sd_raw.c ****     
+ 596:../lib/sd_raw.c ****         /* deaddress card */
+ 597:../lib/sd_raw.c ****         unselect_card();
+ 598:../lib/sd_raw.c ****     
+ 599:../lib/sd_raw.c ****         /* let card some time to finish */
+ 600:../lib/sd_raw.c ****         sd_raw_rec_byte();
+ 601:../lib/sd_raw.c ****     
+ 602:../lib/sd_raw.c ****         return 1;
+ 603:../lib/sd_raw.c ****     #endif
+ 604:../lib/sd_raw.c **** }
+ 605:../lib/sd_raw.c **** 
+ 606:../lib/sd_raw.c **** /**
+ 607:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 608:../lib/sd_raw.c ****  * Writes raw data to the card.
+ 609:../lib/sd_raw.c ****  *
+ 610:../lib/sd_raw.c ****  * \note If write buffering is enabled, you might have to
+ 611:../lib/sd_raw.c ****  *       call sd_raw_sync() before disconnecting the card
+ 612:../lib/sd_raw.c ****  *       to ensure all remaining data has been written.
+ 613:../lib/sd_raw.c ****  *
+ 614:../lib/sd_raw.c ****  * \param[in] offset The offset where to start writing.
+ 615:../lib/sd_raw.c ****  * \param[in] buffer The buffer containing the data to be written.
+ 616:../lib/sd_raw.c ****  * \param[in] length The number of bytes to write.
+ 617:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success.
+ 618:../lib/sd_raw.c ****  * \see sd_raw_read
+ 619:../lib/sd_raw.c ****  */
+ 620:../lib/sd_raw.c **** unsigned char sd_raw_write(unsigned int offset, const unsigned char* buffer, unsigned short length)
+ 621:../lib/sd_raw.c **** {
+ 376              		.loc 1 621 0
+ 377              		@ Function supports interworking.
+ 378              		@ args = 0, pretend = 0, frame = 0
+ 379              		@ frame_needed = 0, uses_anonymous_args = 0
+ 380              	.LVL16:
+ 381 029c F0472DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 382              	.LCFI2:
+ 383              		.loc 1 621 0
+ 384 02a0 0228A0E1 		mov	r2, r2, asl #16
+ 385              	.LVL17:
+ 386 02a4 0090A0E1 		mov	r9, r0
+ 387 02a8 01A0A0E1 		mov	sl, r1
+ 388 02ac 000100EA 		b	.L91
+ 389              	.LVL18:
+ 390              	.L65:
+ 391              	.LBB3:
+ 622:../lib/sd_raw.c ****     #if SD_RAW_WRITE_SUPPORT
+ 623:../lib/sd_raw.c ****     
+ 624:../lib/sd_raw.c ****         if(get_pin_locked())
+ 625:../lib/sd_raw.c ****             return 0;
+ 626:../lib/sd_raw.c ****     
+ 627:../lib/sd_raw.c ****         unsigned int block_address;
+ 628:../lib/sd_raw.c ****         unsigned short block_offset;
+ 629:../lib/sd_raw.c ****         unsigned short write_length;
+ 630:../lib/sd_raw.c ****         while(length > 0)
+ 631:../lib/sd_raw.c ****         {
+ 632:../lib/sd_raw.c ****             /* determine byte count to write at once */
+ 633:../lib/sd_raw.c ****             block_address = offset & 0xfffffe00;
+ 634:../lib/sd_raw.c ****             block_offset = offset & 0x01ff;
+ 392              		.loc 1 634 0
+ 393 02b0 896BA0E1 		mov	r6, r9, asl #23
+ 394 02b4 A66BA0E1 		mov	r6, r6, lsr #23
+ 635:../lib/sd_raw.c ****             write_length = 512 - block_offset; /* write up to block border */
+ 636:../lib/sd_raw.c ****             if(write_length > length)
+ 637:../lib/sd_raw.c ****                 write_length = length;
+ 638:../lib/sd_raw.c ****     
+ 639:../lib/sd_raw.c ****             /* Merge the data to write with the content of the block.
+ 640:../lib/sd_raw.c ****                      * Use the cached block if available.
+ 641:../lib/sd_raw.c ****                      */
+ 642:../lib/sd_raw.c ****             if(block_address != raw_block_address)
+ 395              		.loc 1 642 0
+ 396 02b8 84719FE5 		ldr	r7, .L92
+ 397              		.loc 1 635 0
+ 398 02bc 023C66E2 		rsb	r3, r6, #512
+ 399 02c0 0338A0E1 		mov	r3, r3, asl #16
+ 400              		.loc 1 633 0
+ 401 02c4 7F4FC9E3 		bic	r4, r9, #508
+ 402              	.LVL19:
+ 403              		.loc 1 642 0
+ 404 02c8 000097E5 		ldr	r0, [r7, #0]
+ 405              		.loc 1 633 0
+ 406 02cc 0340C4E3 		bic	r4, r4, #3
+ 407              		.loc 1 635 0
+ 408 02d0 2358A0E1 		mov	r5, r3, lsr #16
+ 409              		.loc 1 636 0
+ 410 02d4 080055E1 		cmp	r5, r8
+ 411 02d8 0850A021 		movcs	r5, r8
+ 412              		.loc 1 642 0
+ 413 02dc 000054E1 		cmp	r4, r0
+ 414 02e0 CF00000A 		beq	.L68
+ 643:../lib/sd_raw.c ****             {
+ 644:../lib/sd_raw.c ****                 #if SD_RAW_WRITE_BUFFERING
+ 645:../lib/sd_raw.c ****                 if(!raw_block_written)
+ 415              		.loc 1 645 0
+ 416 02e4 5C319FE5 		ldr	r3, .L92+4
+ 417 02e8 0030D3E5 		ldrb	r3, [r3, #0]	@ zero_extendqisi2
+ 418 02ec 000053E3 		cmp	r3, #0
+ 419 02f0 C000001A 		bne	.L70
+ 646:../lib/sd_raw.c ****                 {
+ 647:../lib/sd_raw.c ****                     if(!sd_raw_write(raw_block_address, raw_block, sizeof(raw_block)))
+ 420              		.loc 1 647 0
+ 421 02f4 50119FE5 		ldr	r1, .L92+8
+ 422 02f8 022CA0E3 		mov	r2, #512
+ 423 02fc FEFFFFEB 		bl	sd_raw_write
+ 424 0300 000050E3 		cmp	r0, #0
+ 425 0304 0401000A 		beq	.L72
+ 426              	.LVL20:
+ 427              	.L70:
+ 648:../lib/sd_raw.c ****                         return 0;
+ 649:../lib/sd_raw.c ****                 }
+ 650:../lib/sd_raw.c ****             #endif
+ 651:../lib/sd_raw.c **** 
+ 652:../lib/sd_raw.c ****             if(block_offset || write_length < 512)
+ 428              		.loc 1 652 0
+ 429 0308 40319FE5 		ldr	r3, .L92+12
+ 430 030c 030055E1 		cmp	r5, r3
+ 431 0310 0030A083 		movhi	r3, #0
+ 432 0314 0130A093 		movls	r3, #1
+ 433 0318 000056E3 		cmp	r6, #0
+ 434 031c 01308313 		orrne	r3, r3, #1
+ 435 0320 000053E3 		cmp	r3, #0
+ 436 0324 CE00000A 		beq	.L73
+ 653:../lib/sd_raw.c ****             {
+ 654:../lib/sd_raw.c ****                 if(!sd_raw_read(block_address, raw_block, sizeof(raw_block)))
+ 437              		.loc 1 654 0
+ 438 0328 0400A0E1 		mov	r0, r4
+ 439 032c 18119FE5 		ldr	r1, .L92+8
+ 440 0330 022CA0E3 		mov	r2, #512
+ 441 0334 FEFFFFEB 		bl	sd_raw_read
+ 442 0338 000050E3 		cmp	r0, #0
+ 443 033c 0401000A 		beq	.L72
+ 444              	.LVL21:
+ 445              	.L73:
+ 655:../lib/sd_raw.c ****                     return 0;
+ 656:../lib/sd_raw.c ****             }
+ 657:../lib/sd_raw.c ****             raw_block_address = block_address;
+ 446              		.loc 1 657 0
+ 447 0340 004087E5 		str	r4, [r7, #0]
+ 448              	.L68:
+ 658:../lib/sd_raw.c ****         }
+ 659:../lib/sd_raw.c **** 
+ 660:../lib/sd_raw.c ****         if(buffer != raw_block)
+ 449              		.loc 1 660 0
+ 450 0344 00719FE5 		ldr	r7, .L92+8
+ 451 0348 07005AE1 		cmp	sl, r7
+ 452 034c DB00000A 		beq	.L75
+ 661:../lib/sd_raw.c ****         {
+ 662:../lib/sd_raw.c ****             memcpy(raw_block + block_offset, buffer, write_length);
+ 453              		.loc 1 662 0
+ 454 0350 0520A0E1 		mov	r2, r5
+ 455 0354 070086E0 		add	r0, r6, r7
+ 456 0358 0A10A0E1 		mov	r1, sl
+ 457 035c FEFFFFEB 		bl	memcpy
+ 663:../lib/sd_raw.c **** 
+ 664:../lib/sd_raw.c ****             #if SD_RAW_WRITE_BUFFERING
+ 665:../lib/sd_raw.c ****                 raw_block_written = 0;
+ 458              		.loc 1 665 0
+ 459 0360 E0309FE5 		ldr	r3, .L92+4
+ 460 0364 0020A0E3 		mov	r2, #0
+ 666:../lib/sd_raw.c ****     
+ 667:../lib/sd_raw.c ****                 if(length == write_length)
+ 461              		.loc 1 667 0
+ 462 0368 050058E1 		cmp	r8, r5
+ 463              		.loc 1 665 0
+ 464 036c 0020C3E5 		strb	r2, [r3, #0]
+ 465              		.loc 1 667 0
+ 466 0370 0C01000A 		beq	.L77
+ 467              	.LVL22:
+ 468              	.L75:
+ 668:../lib/sd_raw.c ****                     return 1;
+ 669:../lib/sd_raw.c ****             #endif
+ 670:../lib/sd_raw.c ****         }
+ 671:../lib/sd_raw.c **** 
+ 672:../lib/sd_raw.c ****         buffer += write_length;
+ 673:../lib/sd_raw.c **** 
+ 674:../lib/sd_raw.c ****         /* address card */
+ 675:../lib/sd_raw.c ****         select_card();
+ 469              		.loc 1 675 0
+ 470 0374 D8209FE5 		ldr	r2, .L92+16
+ 471 0378 003092E5 		ldr	r3, [r2, #0]
+ 472 037c 803083E3 		orr	r3, r3, #128
+ 676:../lib/sd_raw.c **** 
+ 677:../lib/sd_raw.c ****         /* send single block request */
+ 678:../lib/sd_raw.c ****         if(sd_raw_send_command_r1(CMD_WRITE_SINGLE_BLOCK, block_address))
+ 473              		.loc 1 678 0
+ 474 0380 0410A0E1 		mov	r1, r4
+ 475 0384 1800A0E3 		mov	r0, #24
+ 476              		.loc 1 675 0
+ 477 0388 003082E5 		str	r3, [r2, #0]
+ 478              		.loc 1 678 0
+ 479 038c 2D0000EB 		bl	sd_raw_send_command_r1
+ 480 0390 000050E3 		cmp	r0, #0
+ 481              		.loc 1 672 0
+ 482 0394 05A08AE0 		add	sl, sl, r5
+ 483              		.loc 1 678 0
+ 484 0398 0601001A 		bne	.L86
+ 679:../lib/sd_raw.c ****         {
+ 680:../lib/sd_raw.c ****             unselect_card();
+ 681:../lib/sd_raw.c ****             return 0;
+ 682:../lib/sd_raw.c ****         }
+ 683:../lib/sd_raw.c **** 
+ 684:../lib/sd_raw.c ****         /* send start byte */
+ 685:../lib/sd_raw.c ****         sd_raw_send_byte(0xfe);
+ 485              		.loc 1 685 0
+ 486 039c FE0080E2 		add	r0, r0, #254
+ 487 03a0 230000EB 		bl	sd_raw_send_byte
+ 488 03a4 014087E2 		add	r4, r7, #1
+ 489              	.LVL23:
+ 490              	.L81:
+ 686:../lib/sd_raw.c **** 
+ 687:../lib/sd_raw.c ****         /* write byte block */
+ 688:../lib/sd_raw.c ****         unsigned char* cache = raw_block;
+ 689:../lib/sd_raw.c ****         unsigned short i;
+ 690:../lib/sd_raw.c ****         for(i = 0; i < 512; ++i)
+ 691:../lib/sd_raw.c ****             sd_raw_send_byte(*cache++);
+ 491              		.loc 1 691 0
+ 492 03a8 010054E5 		ldrb	r0, [r4, #-1]	@ zero_extendqisi2
+ 493 03ac 230000EB 		bl	sd_raw_send_byte
+ 494              		.loc 1 690 0
+ 495 03b0 A0309FE5 		ldr	r3, .L92+20
+ 496              		.loc 1 691 0
+ 497 03b4 014084E2 		add	r4, r4, #1
+ 498              		.loc 1 690 0
+ 499 03b8 030054E1 		cmp	r4, r3
+ 500 03bc E800001A 		bne	.L81
+ 692:../lib/sd_raw.c **** 
+ 693:../lib/sd_raw.c ****         /* write dummy crc16 */
+ 694:../lib/sd_raw.c ****         sd_raw_send_byte(0xff);
+ 501              		.loc 1 694 0
+ 502 03c0 FF00A0E3 		mov	r0, #255
+ 503 03c4 230000EB 		bl	sd_raw_send_byte
+ 695:../lib/sd_raw.c ****         sd_raw_send_byte(0xff);
+ 504              		.loc 1 695 0
+ 505 03c8 FF00A0E3 		mov	r0, #255
+ 506 03cc 230000EB 		bl	sd_raw_send_byte
+ 507              	.L83:
+ 696:../lib/sd_raw.c **** 
+ 697:../lib/sd_raw.c ****         /* wait while card is busy */
+ 698:../lib/sd_raw.c ****         while(sd_raw_rec_byte() != 0xff);
+ 508              		.loc 1 698 0
+ 509 03d0 140000EB 		bl	sd_raw_rec_byte
+ 510 03d4 FF0050E3 		cmp	r0, #255
+ 511 03d8 F200001A 		bne	.L83
+ 699:../lib/sd_raw.c ****         sd_raw_rec_byte();
+ 512              		.loc 1 699 0
+ 513 03dc 140000EB 		bl	sd_raw_rec_byte
+ 700:../lib/sd_raw.c **** 
+ 701:../lib/sd_raw.c ****         /* deaddress card */
+ 702:../lib/sd_raw.c ****         unselect_card();
+ 514              		.loc 1 702 0
+ 515 03e0 74109FE5 		ldr	r1, .L92+24
+ 516 03e4 003091E5 		ldr	r3, [r1, #0]
+ 517 03e8 803083E3 		orr	r3, r3, #128
+ 518 03ec 003081E5 		str	r3, [r1, #0]
+ 703:../lib/sd_raw.c **** 
+ 704:../lib/sd_raw.c ****         length -= write_length;
+ 705:../lib/sd_raw.c ****         offset += write_length;
+ 706:../lib/sd_raw.c **** 
+ 707:../lib/sd_raw.c ****         #if SD_RAW_WRITE_BUFFERING
+ 708:../lib/sd_raw.c ****             raw_block_written = 1;
+ 519              		.loc 1 708 0
+ 520 03f0 50309FE5 		ldr	r3, .L92+4
+ 521 03f4 0110A0E3 		mov	r1, #1
+ 522              		.loc 1 704 0
+ 523 03f8 082065E0 		rsb	r2, r5, r8
+ 524              		.loc 1 708 0
+ 525 03fc 0010C3E5 		strb	r1, [r3, #0]
+ 526              		.loc 1 704 0
+ 527 0400 0228A0E1 		mov	r2, r2, asl #16
+ 528              		.loc 1 705 0
+ 529 0404 059089E0 		add	r9, r9, r5
+ 530              	.LVL24:
+ 531              	.L91:
+ 532              		.loc 1 704 0
+ 533 0408 2288A0E1 		mov	r8, r2, lsr #16
+ 534              	.LBE3:
+ 535              		.loc 1 630 0
+ 536 040c 000058E3 		cmp	r8, #0
+ 537 0410 AA00001A 		bne	.L65
+ 538 0414 0C0100EA 		b	.L77
+ 539              	.LVL25:
+ 540              	.L72:
+ 541 0418 0000A0E3 		mov	r0, #0
+ 542 041c 0D0100EA 		b	.L80
+ 543              	.L86:
+ 544              	.LBB4:
+ 545              		.loc 1 680 0
+ 546 0420 34209FE5 		ldr	r2, .L92+24
+ 547 0424 003092E5 		ldr	r3, [r2, #0]
+ 548 0428 0000A0E3 		mov	r0, #0
+ 549 042c 803083E3 		orr	r3, r3, #128
+ 550 0430 003082E5 		str	r3, [r2, #0]
+ 551 0434 0D0100EA 		b	.L80
+ 552              	.LVL26:
+ 553              	.L77:
+ 554              	.LBE4:
+ 555              		.loc 1 630 0
+ 556 0438 0100A0E3 		mov	r0, #1
+ 557              	.L80:
+ 709:../lib/sd_raw.c ****         #endif
+ 710:../lib/sd_raw.c ****     }
+ 711:../lib/sd_raw.c **** 
+ 712:../lib/sd_raw.c ****     return 1;
+ 713:../lib/sd_raw.c ****     #else
+ 714:../lib/sd_raw.c ****         return 0;
+ 715:../lib/sd_raw.c ****     #endif
+ 716:../lib/sd_raw.c **** }
+ 558              		.loc 1 716 0
+ 559 043c F047BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 560 0440 1EFF2FE1 		bx	lr
+ 561              	.L93:
+ 562              		.align	2
+ 563              	.L92:
+ 564 0444 04000000 		.word	raw_block_address
+ 565 0448 00000000 		.word	raw_block_written
+ 566 044c 08000000 		.word	raw_block
+ 567 0450 FF010000 		.word	511
+ 568 0454 0C8002E0 		.word	-536707060
+ 569 0458 09020000 		.word	raw_block+513
+ 570 045c 048002E0 		.word	-536707068
+ 571              	.LFE10:
+ 573              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 574              		.align	2
+ 575              	.LC0:
+ 576 0000 53442052 		.ascii	"SD RAW NOT AVAILABLE\012\015\000"
+ 576      4157204E 
+ 576      4F542041 
+ 576      5641494C 
+ 576      41424C45 
+ 577 0017 00       		.align	2
+ 578              	.LC1:
+ 579 0018 0A0D7265 		.ascii	"\012\015response: %d\012\015\000"
+ 579      73706F6E 
+ 579      73653A20 
+ 579      25640A0D 
+ 579      00
+ 580 0029 000000   		.align	2
+ 581              	.LC2:
+ 582 002c 69203D20 		.ascii	"i = 0x7fff\012\015\000"
+ 582      30783766 
+ 582      66660A0D 
+ 582      00
+ 583 0039 000000   		.align	2
+ 584              	.LC3:
+ 585 003c 424C4F43 		.ascii	"BLOCK SIZE SET ERR \012\015\000"
+ 585      4B205349 
+ 585      5A452053 
+ 585      45542045 
+ 585      5252200A 
+ 586 0052 0000     		.align	2
+ 587              	.LC4:
+ 588 0054 73645F72 		.ascii	"sd_raw_read borks\012\015\000"
+ 588      61775F72 
+ 588      65616420 
+ 588      626F726B 
+ 588      730A0D00 
+ 589              		.text
+ 590              		.align	2
+ 591              		.global	sd_raw_init
+ 593              	sd_raw_init:
+ 594              	.LFB2:
+ 595              		.loc 1 160 0
+ 596              		@ Function supports interworking.
+ 597              		@ args = 0, pretend = 0, frame = 0
+ 598              		@ frame_needed = 0, uses_anonymous_args = 0
+ 599              	.LVL27:
+ 600 0460 70402DE9 		stmfd	sp!, {r4, r5, r6, lr}
+ 601              	.LCFI3:
+ 602              		.loc 1 166 0
+ 603 0464 E0619FE5 		ldr	r6, .L121
+ 604 0468 003096E5 		ldr	r3, [r6, #0]
+ 605 046c 803083E3 		orr	r3, r3, #128
+ 606 0470 003086E5 		str	r3, [r6, #0]
+ 607              		.loc 1 167 0
+ 608 0474 D4219FE5 		ldr	r2, .L121+4
+ 609 0478 003092E5 		ldr	r3, [r2, #0]
+ 610 047c 013A83E3 		orr	r3, r3, #4096
+ 611 0480 003082E5 		str	r3, [r2, #0]
+ 612              		.loc 1 168 0
+ 613 0484 003092E5 		ldr	r3, [r2, #0]
+ 614 0488 013B83E3 		orr	r3, r3, #1024
+ 615 048c 003082E5 		str	r3, [r2, #0]
+ 616              		.loc 1 169 0
+ 617 0490 003092E5 		ldr	r3, [r2, #0]
+ 618 0494 013C83E3 		orr	r3, r3, #256
+ 619 0498 003082E5 		str	r3, [r2, #0]
+ 620              		.loc 1 171 0
+ 621 049c B0519FE5 		ldr	r5, .L121+8
+ 622 04a0 003095E5 		ldr	r3, [r5, #0]
+ 623 04a4 803083E3 		orr	r3, r3, #128
+ 624 04a8 003085E5 		str	r3, [r5, #0]
+ 625              		.loc 1 174 0
+ 626 04ac A4319FE5 		ldr	r3, .L121+12
+ 627 04b0 9620A0E3 		mov	r2, #150
+ 628 04b4 002083E5 		str	r2, [r3, #0]
+ 629              		.loc 1 175 0
+ 630 04b8 3820A0E3 		mov	r2, #56
+ 631 04bc 0C3043E2 		sub	r3, r3, #12
+ 632 04c0 002083E5 		str	r2, [r3, #0]
+ 633              		.loc 1 180 0
+ 634 04c4 FEFFFFEB 		bl	sd_raw_available
+ 635 04c8 004050E2 		subs	r4, r0, #0
+ 636              		.loc 1 182 0
+ 637 04cc 88019F05 		ldreq	r0, .L121+16
+ 638              		.loc 1 180 0
+ 639 04d0 8D01000A 		beq	.L119
+ 640              		.loc 1 185 0
+ 641 04d4 003096E5 		ldr	r3, [r6, #0]
+ 642 04d8 803083E3 		orr	r3, r3, #128
+ 643 04dc 003086E5 		str	r3, [r6, #0]
+ 644              		.loc 1 186 0
+ 645 04e0 003095E5 		ldr	r3, [r5, #0]
+ 646 04e4 803083E3 		orr	r3, r3, #128
+ 647 04e8 003085E5 		str	r3, [r5, #0]
+ 648 04ec 0040A0E3 		mov	r4, #0
+ 649              	.LVL28:
+ 650              	.L98:
+ 651              		.loc 1 193 0
+ 652 04f0 140000EB 		bl	sd_raw_rec_byte
+ 653              		.loc 1 190 0
+ 654 04f4 013084E2 		add	r3, r4, #1
+ 655 04f8 0338A0E1 		mov	r3, r3, asl #16
+ 656 04fc 2348A0E1 		mov	r4, r3, lsr #16
+ 657 0500 0A0054E3 		cmp	r4, #10
+ 658 0504 3A01001A 		bne	.L98
+ 659              		.loc 1 197 0
+ 660 0508 50219FE5 		ldr	r2, .L121+20
+ 661 050c 003092E5 		ldr	r3, [r2, #0]
+ 662 0510 803083E3 		orr	r3, r3, #128
+ 663 0514 003082E5 		str	r3, [r2, #0]
+ 664 0518 0040A0E3 		mov	r4, #0
+ 665              	.LVL29:
+ 666              	.L100:
+ 667              		.loc 1 203 0
+ 668 051c 0000A0E3 		mov	r0, #0
+ 669 0520 0010A0E1 		mov	r1, r0
+ 670 0524 2D0000EB 		bl	sd_raw_send_command_r1
+ 671              		.loc 1 201 0
+ 672 0528 013084E2 		add	r3, r4, #1
+ 673              		.loc 1 204 0
+ 674 052c 010050E3 		cmp	r0, #1
+ 675              		.loc 1 201 0
+ 676 0530 0328A0E1 		mov	r2, r3, asl #16
+ 677              		.loc 1 204 0
+ 678 0534 5101000A 		beq	.L101
+ 679              		.loc 1 206 0
+ 680 0538 24319FE5 		ldr	r3, .L121+24
+ 681 053c 030054E1 		cmp	r4, r3
+ 682              		.loc 1 201 0
+ 683 0540 2248A0E1 		mov	r4, r2, lsr #16
+ 684              		.loc 1 206 0
+ 685 0544 7B01000A 		beq	.L115
+ 686 0548 450100EA 		b	.L100
+ 687              	.L101:
+ 688              		.loc 1 212 0
+ 689 054c 0040A0E3 		mov	r4, #0
+ 690              	.LVL30:
+ 691              	.L105:
+ 692              		.loc 1 217 0
+ 693 0550 0010A0E3 		mov	r1, #0
+ 694 0554 0100A0E3 		mov	r0, #1
+ 695 0558 2D0000EB 		bl	sd_raw_send_command_r1
+ 696              		.loc 1 215 0
+ 697 055c 013084E2 		add	r3, r4, #1
+ 698              		.loc 1 218 0
+ 699 0560 010010E3 		tst	r0, #1
+ 700              		.loc 1 215 0
+ 701 0564 0328A0E1 		mov	r2, r3, asl #16
+ 702              		.loc 1 218 0
+ 703 0568 5E01000A 		beq	.L106
+ 704              		.loc 1 221 0
+ 705 056c F4309FE5 		ldr	r3, .L121+28
+ 706 0570 030054E1 		cmp	r4, r3
+ 707              		.loc 1 215 0
+ 708 0574 2248A0E1 		mov	r4, r2, lsr #16
+ 709              		.loc 1 221 0
+ 710 0578 8401000A 		beq	.L116
+ 711 057c 520100EA 		b	.L105
+ 712              	.L106:
+ 713              		.loc 1 230 0
+ 714 0580 1000A0E3 		mov	r0, #16
+ 715 0584 021CA0E3 		mov	r1, #512
+ 716 0588 2D0000EB 		bl	sd_raw_send_command_r1
+ 717 058c 000050E3 		cmp	r0, #0
+ 718              		.loc 1 232 0
+ 719 0590 BC209F15 		ldrne	r2, .L121+8
+ 720 0594 00309215 		ldrne	r3, [r2, #0]
+ 721              		.loc 1 233 0
+ 722 0598 CC009F15 		ldrne	r0, .L121+32
+ 723              		.loc 1 232 0
+ 724 059c 80308313 		orrne	r3, r3, #128
+ 725 05a0 8801001A 		bne	.L120
+ 726              	.L110:
+ 727              		.loc 1 238 0
+ 728 05a4 A8C09FE5 		ldr	ip, .L121+8
+ 729 05a8 00309CE5 		ldr	r3, [ip, #0]
+ 730 05ac 803083E3 		orr	r3, r3, #128
+ 731 05b0 00308CE5 		str	r3, [ip, #0]
+ 732              		.loc 1 245 0
+ 733 05b4 B4309FE5 		ldr	r3, .L121+36
+ 734 05b8 00C0E0E3 		mvn	ip, #0
+ 735 05bc 00C083E5 		str	ip, [r3, #0]
+ 736              		.loc 1 241 0
+ 737 05c0 90309FE5 		ldr	r3, .L121+12
+ 738 05c4 3DC08CE2 		add	ip, ip, #61
+ 739 05c8 00C083E5 		str	ip, [r3, #0]
+ 740              		.loc 1 247 0
+ 741 05cc A0309FE5 		ldr	r3, .L121+40
+ 742 05d0 0150A0E3 		mov	r5, #1
+ 743              		.loc 1 249 0
+ 744 05d4 9C109FE5 		ldr	r1, .L121+44
+ 745 05d8 022CA0E3 		mov	r2, #512
+ 746              		.loc 1 247 0
+ 747 05dc 0050C3E5 		strb	r5, [r3, #0]
+ 748              		.loc 1 249 0
+ 749 05e0 FEFFFFEB 		bl	sd_raw_read
+ 750 05e4 004050E2 		subs	r4, r0, #0
+ 751              	.LVL31:
+ 752 05e8 0500A011 		movne	r0, r5
+ 753 05ec 8F01001A 		bne	.L97
+ 754 05f0 8C0100EA 		b	.L112
+ 755              	.LVL32:
+ 756              	.L115:
+ 757              		.loc 1 208 0
+ 758 05f4 0010A0E1 		mov	r1, r0
+ 759              	.LVL33:
+ 760 05f8 7C009FE5 		ldr	r0, .L121+48
+ 761 05fc FEFFFFEB 		bl	rprintf
+ 762              	.LVL34:
+ 763              		.loc 1 209 0
+ 764 0600 4C209FE5 		ldr	r2, .L121+8
+ 765 0604 003092E5 		ldr	r3, [r2, #0]
+ 766 0608 0000A0E3 		mov	r0, #0
+ 767 060c 803083E3 		orr	r3, r3, #128
+ 768 0610 003082E5 		str	r3, [r2, #0]
+ 769 0614 8F0100EA 		b	.L97
+ 770              	.LVL35:
+ 771              	.L116:
+ 772              		.loc 1 223 0
+ 773 0618 34209FE5 		ldr	r2, .L121+8
+ 774 061c 003092E5 		ldr	r3, [r2, #0]
+ 775              		.loc 1 224 0
+ 776 0620 58009FE5 		ldr	r0, .L121+52
+ 777              		.loc 1 223 0
+ 778 0624 803083E3 		orr	r3, r3, #128
+ 779              	.L120:
+ 780 0628 003082E5 		str	r3, [r2, #0]
+ 781              		.loc 1 224 0
+ 782 062c FEFFFFEB 		bl	rprintf
+ 783 0630 0000A0E3 		mov	r0, #0
+ 784 0634 8F0100EA 		b	.L97
+ 785              	.LVL36:
+ 786              	.L112:
+ 787              		.loc 1 251 0
+ 788 0638 44009FE5 		ldr	r0, .L121+56
+ 789              	.L119:
+ 790 063c FEFFFFEB 		bl	rprintf
+ 791 0640 0400A0E1 		mov	r0, r4
+ 792              	.LVL37:
+ 793              	.L97:
+ 794              		.loc 1 257 0
+ 795 0644 7040BDE8 		ldmfd	sp!, {r4, r5, r6, lr}
+ 796 0648 1EFF2FE1 		bx	lr
+ 797              	.L122:
+ 798              		.align	2
+ 799              	.L121:
+ 800 064c 088002E0 		.word	-536707064
+ 801 0650 00C002E0 		.word	-536690688
+ 802 0654 048002E0 		.word	-536707068
+ 803 0658 0C0002E0 		.word	-536739828
+ 804 065c 00000000 		.word	.LC0
+ 805 0660 0C8002E0 		.word	-536707060
+ 806 0664 FF010000 		.word	511
+ 807 0668 FF7F0000 		.word	32767
+ 808 066c 3C000000 		.word	.LC3
+ 809 0670 04000000 		.word	raw_block_address
+ 810 0674 00000000 		.word	raw_block_written
+ 811 0678 08000000 		.word	raw_block
+ 812 067c 18000000 		.word	.LC1
+ 813 0680 2C000000 		.word	.LC2
+ 814 0684 54000000 		.word	.LC4
+ 815              	.LFE2:
+ 817              		.align	2
+ 818              		.global	sd_raw_read_interval
+ 820              	sd_raw_read_interval:
+ 821              	.LFB9:
+ 822              		.loc 1 511 0
+ 823              		@ Function supports interworking.
+ 824              		@ args = 8, pretend = 0, frame = 0
+ 825              		@ frame_needed = 0, uses_anonymous_args = 0
+ 826              	.LVL38:
+ 827 0688 0228A0E1 		mov	r2, r2, asl #16
+ 828              	.LVL39:
+ 829 068c F0452DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, sl, lr}
+ 830              	.LCFI4:
+ 831              		.loc 1 511 0
+ 832 0690 0338A0E1 		mov	r3, r3, asl #16
+ 833              	.LVL40:
+ 834              		.loc 1 512 0
+ 835 0694 000052E3 		cmp	r2, #0
+ 836 0698 00005113 		cmpne	r1, #0
+ 837 069c 0170A0E1 		mov	r7, r1
+ 838              		.loc 1 511 0
+ 839 06a0 0060A0E1 		mov	r6, r0
+ 840 06a4 2358A0E1 		mov	r5, r3, lsr #16
+ 841              	.LVL41:
+ 842 06a8 1C808DE2 		add	r8, sp, #28
+ 843 06ac 000598E8 		ldmia	r8, {r8, sl}	@ phole ldm
+ 844              		.loc 1 512 0
+ 845 06b0 2248A0E1 		mov	r4, r2, lsr #16
+ 846              	.LVL42:
+ 847 06b4 C701000A 		beq	.L124
+ 848              	.LVL43:
+ 849 06b8 013078E2 		rsbs	r3, r8, #1
+ 850 06bc 0030A033 		movcc	r3, #0
+ 851 06c0 040055E1 		cmp	r5, r4
+ 852 06c4 01308333 		orrcc	r3, r3, #1
+ 853 06c8 000053E3 		cmp	r3, #0
+ 854 06cc C101000A 		beq	.L133
+ 855 06d0 C70100EA 		b	.L124
+ 856              	.LVL44:
+ 857              	.L127:
+ 858              		.loc 1 521 0
+ 859 06d4 FEFFFFEB 		bl	sd_raw_read
+ 860              	.LVL45:
+ 861 06d8 000050E3 		cmp	r0, #0
+ 862              		.loc 1 523 0
+ 863 06dc 0610A0E1 		mov	r1, r6
+ 864 06e0 0A20A0E1 		mov	r2, sl
+ 865 06e4 0700A0E1 		mov	r0, r7
+ 866              		.loc 1 525 0
+ 867 06e8 046086E0 		add	r6, r6, r4
+ 868              		.loc 1 521 0
+ 869 06ec C701000A 		beq	.L124
+ 870              	.LVL46:
+ 871              		.loc 1 523 0
+ 872 06f0 0FE0A0E1 		mov	lr, pc
+ 873 06f4 18FF2FE1 		bx	r8
+ 874              	.LVL47:
+ 875 06f8 000050E3 		cmp	r0, #0
+ 876 06fc C901000A 		beq	.L129
+ 877              		.loc 1 526 0
+ 878 0700 053064E0 		rsb	r3, r4, r5
+ 879 0704 0338A0E1 		mov	r3, r3, asl #16
+ 880 0708 2358A0E1 		mov	r5, r3, lsr #16
+ 881              	.LVL48:
+ 882              	.L133:
+ 883              		.loc 1 516 0
+ 884 070c 040055E1 		cmp	r5, r4
+ 885              		.loc 1 521 0
+ 886 0710 0600A0E1 		mov	r0, r6
+ 887 0714 0710A0E1 		mov	r1, r7
+ 888 0718 0420A0E1 		mov	r2, r4
+ 889              		.loc 1 516 0
+ 890 071c B301002A 		bcs	.L127
+ 891              	.LVL49:
+ 892 0720 C90100EA 		b	.L129
+ 893              	.LVL50:
+ 894              	.L124:
+ 895 0724 0000A0E3 		mov	r0, #0
+ 896 0728 CA0100EA 		b	.L131
+ 897              	.LVL51:
+ 898              	.L129:
+ 899 072c 0100A0E3 		mov	r0, #1
+ 900              	.LVL52:
+ 901              	.L131:
+ 902              		.loc 1 604 0
+ 903 0730 F045BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, sl, lr}
+ 904 0734 1EFF2FE1 		bx	lr
+ 905              	.LFE9:
+ 907              		.align	2
+ 908              		.global	sd_raw_sync
+ 910              	sd_raw_sync:
+ 911              	.LFB11:
+ 717:../lib/sd_raw.c **** 
+ 718:../lib/sd_raw.c **** /**
+ 719:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 720:../lib/sd_raw.c ****  * Writes the write buffer's content to the card.
+ 721:../lib/sd_raw.c ****  *
+ 722:../lib/sd_raw.c ****  * \note When write buffering is enabled, you should
+ 723:../lib/sd_raw.c ****  *       call this function before disconnecting the
+ 724:../lib/sd_raw.c ****  *       card to ensure all remaining data has been
+ 725:../lib/sd_raw.c ****  *       written.
+ 726:../lib/sd_raw.c ****  *
+ 727:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success.
+ 728:../lib/sd_raw.c ****  * \see sd_raw_write
+ 729:../lib/sd_raw.c ****  */
+ 730:../lib/sd_raw.c **** unsigned char sd_raw_sync()
+ 731:../lib/sd_raw.c **** {
+ 912              		.loc 1 731 0
+ 913              		@ Function supports interworking.
+ 914              		@ args = 0, pretend = 0, frame = 0
+ 915              		@ frame_needed = 0, uses_anonymous_args = 0
+ 916              	.LVL53:
+ 917 0738 04E02DE5 		str	lr, [sp, #-4]!
+ 918              	.LCFI5:
+ 732:../lib/sd_raw.c ****     #if SD_RAW_WRITE_SUPPORT
+ 733:../lib/sd_raw.c ****         #if SD_RAW_WRITE_BUFFERING
+ 734:../lib/sd_raw.c ****         if(raw_block_written)
+ 919              		.loc 1 734 0
+ 920 073c 30309FE5 		ldr	r3, .L140
+ 921 0740 0030D3E5 		ldrb	r3, [r3, #0]	@ zero_extendqisi2
+ 922 0744 000053E3 		cmp	r3, #0
+ 735:../lib/sd_raw.c ****             return 1;
+ 736:../lib/sd_raw.c ****         if(!sd_raw_write(raw_block_address, raw_block, sizeof(raw_block)))
+ 923              		.loc 1 736 0
+ 924 0748 28109FE5 		ldr	r1, .L140+4
+ 925 074c 022CA0E3 		mov	r2, #512
+ 926              		.loc 1 734 0
+ 927 0750 D801001A 		bne	.L135
+ 928              		.loc 1 736 0
+ 929 0754 20309FE5 		ldr	r3, .L140+8
+ 930 0758 000093E5 		ldr	r0, [r3, #0]
+ 931 075c FEFFFFEB 		bl	sd_raw_write
+ 932 0760 000050E3 		cmp	r0, #0
+ 933 0764 D901000A 		beq	.L138
+ 934              	.L135:
+ 935 0768 0100A0E3 		mov	r0, #1
+ 936              	.L138:
+ 737:../lib/sd_raw.c ****             return 0;
+ 738:../lib/sd_raw.c ****     #endif
+ 739:../lib/sd_raw.c ****     return 1;
+ 740:../lib/sd_raw.c ****     #else
+ 741:../lib/sd_raw.c ****     return 0;
+ 742:../lib/sd_raw.c ****     #endif
+ 743:../lib/sd_raw.c **** }
+ 937              		.loc 1 743 0
+ 938 076c 04E09DE4 		ldr	lr, [sp], #4
+ 939 0770 1EFF2FE1 		bx	lr
+ 940              	.L141:
+ 941              		.align	2
+ 942              	.L140:
+ 943 0774 00000000 		.word	raw_block_written
+ 944 0778 08000000 		.word	raw_block
+ 945 077c 04000000 		.word	raw_block_address
+ 946              	.LFE11:
+ 948              		.align	2
+ 949              		.global	sd_raw_get_info
+ 951              	sd_raw_get_info:
+ 952              	.LFB12:
+ 744:../lib/sd_raw.c **** 
+ 745:../lib/sd_raw.c **** /**
+ 746:../lib/sd_raw.c ****  * \ingroup sd_raw
+ 747:../lib/sd_raw.c ****  * Reads informational data from the card.
+ 748:../lib/sd_raw.c ****  *
+ 749:../lib/sd_raw.c ****  * This function reads and returns the card's registers
+ 750:../lib/sd_raw.c ****  * containing manufacturing and status information.
+ 751:../lib/sd_raw.c ****  *
+ 752:../lib/sd_raw.c ****  * \note: The information retrieved by this function is
+ 753:../lib/sd_raw.c ****  *        not required in any way to operate on the card,
+ 754:../lib/sd_raw.c ****  *        but it might be nice to display some of the data
+ 755:../lib/sd_raw.c ****  *        to the user.
+ 756:../lib/sd_raw.c ****  *
+ 757:../lib/sd_raw.c ****  * \param[in] info A pointer to the structure into which to save the information.
+ 758:../lib/sd_raw.c ****  * \returns 0 on failure, 1 on success.
+ 759:../lib/sd_raw.c ****  */
+ 760:../lib/sd_raw.c **** unsigned char sd_raw_get_info(struct sd_raw_info* info)
+ 761:../lib/sd_raw.c **** {
+ 953              		.loc 1 761 0
+ 954              		@ Function supports interworking.
+ 955              		@ args = 0, pretend = 0, frame = 0
+ 956              		@ frame_needed = 0, uses_anonymous_args = 0
+ 957              	.LVL54:
+ 958 0780 F0412DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 959              	.LCFI6:
+ 762:../lib/sd_raw.c ****     if(!info || !sd_raw_available())
+ 960              		.loc 1 762 0
+ 961 0784 004050E2 		subs	r4, r0, #0
+ 962 0788 7202000A 		beq	.L143
+ 963              	.LVL55:
+ 964 078c FEFFFFEB 		bl	sd_raw_available
+ 965 0790 000050E3 		cmp	r0, #0
+ 966 0794 7202000A 		beq	.L143
+ 763:../lib/sd_raw.c ****         return 0;
+ 764:../lib/sd_raw.c **** 
+ 765:../lib/sd_raw.c ****     memset(info, 0, sizeof(*info));
+ 967              		.loc 1 765 0
+ 968 0798 0010A0E3 		mov	r1, #0
+ 969 079c 1C20A0E3 		mov	r2, #28
+ 970 07a0 0400A0E1 		mov	r0, r4
+ 971 07a4 FEFFFFEB 		bl	memset
+ 766:../lib/sd_raw.c **** 
+ 767:../lib/sd_raw.c ****     select_card();
+ 972              		.loc 1 767 0
+ 973 07a8 2C229FE5 		ldr	r2, .L195
+ 974 07ac 003092E5 		ldr	r3, [r2, #0]
+ 975 07b0 803083E3 		orr	r3, r3, #128
+ 768:../lib/sd_raw.c **** 
+ 769:../lib/sd_raw.c ****     /* read cid register */
+ 770:../lib/sd_raw.c ****     if(sd_raw_send_command_r1(CMD_SEND_CID, 0))
+ 976              		.loc 1 770 0
+ 977 07b4 0A00A0E3 		mov	r0, #10
+ 978 07b8 0010A0E3 		mov	r1, #0
+ 979              		.loc 1 767 0
+ 980 07bc 003082E5 		str	r3, [r2, #0]
+ 981              		.loc 1 770 0
+ 982 07c0 2D0000EB 		bl	sd_raw_send_command_r1
+ 983 07c4 000050E3 		cmp	r0, #0
+ 984 07c8 2902001A 		bne	.L193
+ 985              	.L182:
+ 771:../lib/sd_raw.c ****     {
+ 772:../lib/sd_raw.c ****         unselect_card();
+ 773:../lib/sd_raw.c ****         return 0;
+ 774:../lib/sd_raw.c ****     }
+ 775:../lib/sd_raw.c ****     while(sd_raw_rec_byte() != 0xfe);
+ 986              		.loc 1 775 0
+ 987 07cc 140000EB 		bl	sd_raw_rec_byte
+ 988 07d0 FE0050E3 		cmp	r0, #254
+ 989 07d4 F101001A 		bne	.L182
+ 990 07d8 0450A0E1 		mov	r5, r4
+ 991 07dc 0060A0E3 		mov	r6, #0
+ 992 07e0 6070A0E3 		mov	r7, #96
+ 993              	.LVL56:
+ 994              	.L150:
+ 995              	.LBB5:
+ 776:../lib/sd_raw.c ****     unsigned char i;
+ 777:../lib/sd_raw.c ****     for(i = 0; i < 18; ++i)
+ 778:../lib/sd_raw.c ****     {
+ 779:../lib/sd_raw.c ****         unsigned char b = sd_raw_rec_byte();
+ 996              		.loc 1 779 0
+ 997 07e4 140000EB 		bl	sd_raw_rec_byte
+ 998              	.LVL57:
+ 780:../lib/sd_raw.c **** 
+ 781:../lib/sd_raw.c ****         switch(i)
+ 999              		.loc 1 781 0
+ 1000 07e8 FF3006E2 		and	r3, r6, #255
+ 1001 07ec 0E0053E3 		cmp	r3, #14
+ 1002 07f0 03F19F97 		ldrls	pc, [pc, r3, asl #2]
+ 1003 07f4 1F0200EA 		b	.L151
+ 1004              		.p2align 2
+ 1005              	.L159:
+ 1006 07f8 34080000 		.word	.L152
+ 1007 07fc 3C080000 		.word	.L153
+ 1008 0800 3C080000 		.word	.L153
+ 1009 0804 44080000 		.word	.L154
+ 1010 0808 44080000 		.word	.L154
+ 1011 080c 44080000 		.word	.L154
+ 1012 0810 44080000 		.word	.L154
+ 1013 0814 44080000 		.word	.L154
+ 1014 0818 4C080000 		.word	.L155
+ 1015 081c 54080000 		.word	.L156
+ 1016 0820 54080000 		.word	.L156
+ 1017 0824 54080000 		.word	.L156
+ 1018 0828 54080000 		.word	.L156
+ 1019 082c 64080000 		.word	.L157
+ 1020 0830 70080000 		.word	.L158
+ 1021              	.L152:
+ 1022              	.LVL58:
+ 782:../lib/sd_raw.c ****         {
+ 783:../lib/sd_raw.c ****             case 0:
+ 784:../lib/sd_raw.c ****                 info->manufacturer = b;
+ 1023              		.loc 1 784 0
+ 1024 0834 0000C4E5 		strb	r0, [r4, #0]
+ 1025 0838 1F0200EA 		b	.L151
+ 1026              	.LVL59:
+ 1027              	.L153:
+ 1028              	.LVL60:
+ 785:../lib/sd_raw.c ****                 break;
+ 786:../lib/sd_raw.c ****             case 1:
+ 787:../lib/sd_raw.c ****             case 2:
+ 788:../lib/sd_raw.c ****                 info->oem[i - 1] = b;
+ 1029              		.loc 1 788 0
+ 1030 083c 0000C5E5 		strb	r0, [r5, #0]
+ 1031 0840 1F0200EA 		b	.L151
+ 1032              	.LVL61:
+ 1033              	.L154:
+ 1034              	.LVL62:
+ 789:../lib/sd_raw.c ****                 break;
+ 790:../lib/sd_raw.c ****             case 3:
+ 791:../lib/sd_raw.c ****             case 4:
+ 792:../lib/sd_raw.c ****             case 5:
+ 793:../lib/sd_raw.c ****             case 6:
+ 794:../lib/sd_raw.c ****             case 7:
+ 795:../lib/sd_raw.c ****                 info->product[i - 3] = b;
+ 1035              		.loc 1 795 0
+ 1036 0844 0100C5E5 		strb	r0, [r5, #1]
+ 1037 0848 1F0200EA 		b	.L151
+ 1038              	.LVL63:
+ 1039              	.L155:
+ 1040              	.LVL64:
+ 796:../lib/sd_raw.c ****                 break;
+ 797:../lib/sd_raw.c ****             case 8:
+ 798:../lib/sd_raw.c ****                 info->revision = b;
+ 1041              		.loc 1 798 0
+ 1042 084c 0A00C4E5 		strb	r0, [r4, #10]
+ 1043 0850 1F0200EA 		b	.L151
+ 1044              	.LVL65:
+ 1045              	.L156:
+ 799:../lib/sd_raw.c ****                 break;
+ 800:../lib/sd_raw.c ****             case 9:
+ 801:../lib/sd_raw.c ****             case 10:
+ 802:../lib/sd_raw.c ****             case 11:
+ 803:../lib/sd_raw.c ****             case 12:
+ 804:../lib/sd_raw.c ****                 info->serial |= (unsigned int) b << ((12 - i) * 8);
+ 1046              		.loc 1 804 0
+ 1047 0854 0C3094E5 		ldr	r3, [r4, #12]
+ 1048              	.LVL66:
+ 1049 0858 103783E1 		orr	r3, r3, r0, asl r7
+ 1050 085c 0C3084E5 		str	r3, [r4, #12]
+ 1051 0860 1F0200EA 		b	.L151
+ 1052              	.LVL67:
+ 1053              	.L157:
+ 1054              	.LVL68:
+ 805:../lib/sd_raw.c ****                 break;
+ 806:../lib/sd_raw.c ****             case 13:
+ 807:../lib/sd_raw.c ****                 info->manufacturing_year = b << 4;
+ 1055              		.loc 1 807 0
+ 1056 0864 0032A0E1 		mov	r3, r0, asl #4
+ 1057 0868 1030C4E5 		strb	r3, [r4, #16]
+ 1058 086c 1F0200EA 		b	.L151
+ 1059              	.LVL69:
+ 1060              	.L158:
+ 808:../lib/sd_raw.c ****                 break;
+ 809:../lib/sd_raw.c ****             case 14:
+ 810:../lib/sd_raw.c ****                 info->manufacturing_year |= b >> 4;
+ 1061              		.loc 1 810 0
+ 1062 0870 1030D4E5 		ldrb	r3, [r4, #16]	@ zero_extendqisi2
+ 1063              	.LVL70:
+ 811:../lib/sd_raw.c ****                 info->manufacturing_month = b & 0x0f;
+ 1064              		.loc 1 811 0
+ 1065 0874 0F2000E2 		and	r2, r0, #15
+ 1066              		.loc 1 810 0
+ 1067 0878 203283E1 		orr	r3, r3, r0, lsr #4
+ 1068 087c 1030C4E5 		strb	r3, [r4, #16]
+ 1069              		.loc 1 811 0
+ 1070 0880 1120C4E5 		strb	r2, [r4, #17]
+ 1071              	.L151:
+ 1072 0884 016086E2 		add	r6, r6, #1
+ 1073              	.LBE5:
+ 1074              		.loc 1 777 0
+ 1075 0888 120056E3 		cmp	r6, #18
+ 1076              	.LBB6:
+ 1077              		.loc 1 811 0
+ 1078 088c 015085E2 		add	r5, r5, #1
+ 1079 0890 087047E2 		sub	r7, r7, #8
+ 1080              	.LBE6:
+ 1081              		.loc 1 777 0
+ 1082 0894 F701001A 		bne	.L150
+ 812:../lib/sd_raw.c ****                 break;
+ 813:../lib/sd_raw.c ****         }
+ 814:../lib/sd_raw.c ****     }
+ 815:../lib/sd_raw.c **** 
+ 816:../lib/sd_raw.c ****     /* read csd register */
+ 817:../lib/sd_raw.c ****     unsigned char csd_read_bl_len = 0;
+ 818:../lib/sd_raw.c ****     unsigned char csd_c_size_mult = 0;
+ 819:../lib/sd_raw.c ****     unsigned short csd_c_size = 0;
+ 820:../lib/sd_raw.c ****     if(sd_raw_send_command_r1(CMD_SEND_CSD, 0))
+ 1083              		.loc 1 820 0
+ 1084 0898 0900A0E3 		mov	r0, #9
+ 1085              	.LVL71:
+ 1086 089c 0010A0E3 		mov	r1, #0
+ 1087 08a0 2D0000EB 		bl	sd_raw_send_command_r1
+ 1088 08a4 000050E3 		cmp	r0, #0
+ 1089 08a8 2E02000A 		beq	.L183
+ 1090              	.L193:
+ 821:../lib/sd_raw.c ****     {
+ 822:../lib/sd_raw.c ****         unselect_card();
+ 1091              		.loc 1 822 0
+ 1092 08ac 2C219FE5 		ldr	r2, .L195+4
+ 1093 08b0 003092E5 		ldr	r3, [r2, #0]
+ 1094 08b4 0000A0E3 		mov	r0, #0
+ 1095 08b8 803083E3 		orr	r3, r3, #128
+ 1096 08bc 700200EA 		b	.L194
+ 1097              	.L183:
+ 823:../lib/sd_raw.c ****         return 0;
+ 824:../lib/sd_raw.c ****     }
+ 825:../lib/sd_raw.c ****     while(sd_raw_rec_byte() != 0xfe);
+ 1098              		.loc 1 825 0
+ 1099 08c0 140000EB 		bl	sd_raw_rec_byte
+ 1100 08c4 FE0050E3 		cmp	r0, #254
+ 1101 08c8 2E02001A 		bne	.L183
+ 1102 08cc 0080A0E3 		mov	r8, #0
+ 1103              	.LVL72:
+ 1104 08d0 0860A0E1 		mov	r6, r8
+ 1105 08d4 0870A0E1 		mov	r7, r8
+ 1106              	.LVL73:
+ 1107 08d8 0850A0E1 		mov	r5, r8
+ 1108              	.LVL74:
+ 1109              	.LVL75:
+ 1110              	.L164:
+ 1111              	.LBB7:
+ 826:../lib/sd_raw.c ****     for(i = 0; i < 18; ++i)
+ 827:../lib/sd_raw.c ****     {
+ 828:../lib/sd_raw.c ****         unsigned char b = sd_raw_rec_byte();
+ 1112              		.loc 1 828 0
+ 1113 08dc 140000EB 		bl	sd_raw_rec_byte
+ 1114              	.LVL76:
+ 829:../lib/sd_raw.c **** 
+ 830:../lib/sd_raw.c ****         switch(i)
+ 1115              		.loc 1 830 0
+ 1116 08e0 FF3006E2 		and	r3, r6, #255
+ 1117 08e4 053043E2 		sub	r3, r3, #5
+ 1118 08e8 090053E3 		cmp	r3, #9
+ 1119 08ec 03F19F97 		ldrls	pc, [pc, r3, asl #2]
+ 1120 08f0 690200EA 		b	.L165
+ 1121              		.p2align 2
+ 1122              	.L173:
+ 1123 08f4 1C090000 		.word	.L166
+ 1124 08f8 24090000 		.word	.L167
+ 1125 08fc 30090000 		.word	.L168
+ 1126 0900 3C090000 		.word	.L169
+ 1127 0904 54090000 		.word	.L170
+ 1128 0908 60090000 		.word	.L171
+ 1129 090c AC090000 		.word	.L165
+ 1130 0910 AC090000 		.word	.L165
+ 1131 0914 AC090000 		.word	.L165
+ 1132 0918 7C090000 		.word	.L172
+ 1133              	.L166:
+ 1134              	.LVL77:
+ 831:../lib/sd_raw.c ****         {
+ 832:../lib/sd_raw.c ****             case 5:
+ 833:../lib/sd_raw.c ****                 csd_read_bl_len = b & 0x0f;
+ 1135              		.loc 1 833 0
+ 1136 091c 0F8000E2 		and	r8, r0, #15
+ 1137 0920 690200EA 		b	.L165
+ 1138              	.LVL78:
+ 1139              	.L167:
+ 1140              	.LVL79:
+ 834:../lib/sd_raw.c ****                 break;
+ 835:../lib/sd_raw.c ****             case 6:
+ 836:../lib/sd_raw.c ****                 csd_c_size = (unsigned short) (b & 0x03) << 8;
+ 1141              		.loc 1 836 0
+ 1142 0924 033000E2 		and	r3, r0, #3
+ 1143 0928 0354A0E1 		mov	r5, r3, asl #8
+ 1144 092c 690200EA 		b	.L165
+ 1145              	.LVL80:
+ 1146              	.L168:
+ 1147              	.LVL81:
+ 837:../lib/sd_raw.c ****                 break;
+ 838:../lib/sd_raw.c ****             case 7:
+ 839:../lib/sd_raw.c ****                 csd_c_size |= b;
+ 1148              		.loc 1 839 0
+ 1149 0930 003085E1 		orr	r3, r5, r0
+ 840:../lib/sd_raw.c ****                 csd_c_size <<= 2;
+ 1150              		.loc 1 840 0
+ 1151 0934 0339A0E1 		mov	r3, r3, asl #18
+ 1152 0938 510200EA 		b	.L192
+ 1153              	.LVL82:
+ 1154              	.L169:
+ 1155              	.LVL83:
+ 841:../lib/sd_raw.c ****                 break;
+ 842:../lib/sd_raw.c ****             case 8:
+ 843:../lib/sd_raw.c ****                 csd_c_size |= b >> 6;
+ 1156              		.loc 1 843 0
+ 1157 093c 0039A0E1 		mov	r3, r0, asl #18
+ 1158 0940 233C85E1 		orr	r3, r5, r3, lsr #24
+ 1159              	.LVL84:
+ 844:../lib/sd_raw.c ****                 ++csd_c_size;
+ 1160              		.loc 1 844 0
+ 1161 0944 013083E2 		add	r3, r3, #1
+ 1162              	.LVL85:
+ 1163 0948 0338A0E1 		mov	r3, r3, asl #16
+ 1164              	.L192:
+ 1165 094c 2358A0E1 		mov	r5, r3, lsr #16
+ 1166 0950 690200EA 		b	.L165
+ 1167              	.LVL86:
+ 1168              	.L170:
+ 1169              	.LVL87:
+ 845:../lib/sd_raw.c ****                 break;
+ 846:../lib/sd_raw.c ****             case 9:
+ 847:../lib/sd_raw.c ****                 csd_c_size_mult = (b & 0x03) << 1;
+ 1170              		.loc 1 847 0
+ 1171 0954 033000E2 		and	r3, r0, #3
+ 1172 0958 8370A0E1 		mov	r7, r3, asl #1
+ 1173 095c 690200EA 		b	.L165
+ 1174              	.LVL88:
+ 1175              	.L171:
+ 1176              	.LVL89:
+ 848:../lib/sd_raw.c ****                 break;
+ 849:../lib/sd_raw.c ****             case 10:
+ 850:../lib/sd_raw.c ****                 csd_c_size_mult |= b >> 7;
+ 1177              		.loc 1 850 0
+ 1178 0960 A03387E1 		orr	r3, r7, r0, lsr #7
+ 1179 0964 FF7003E2 		and	r7, r3, #255
+ 851:../lib/sd_raw.c **** 
+ 852:../lib/sd_raw.c ****                 info->capacity = (unsigned int) csd_c_size << (csd_c_size_mult + csd_read_bl_len + 
+ 1180              		.loc 1 852 0
+ 1181 0968 083087E0 		add	r3, r7, r8
+ 1182 096c 023083E2 		add	r3, r3, #2
+ 1183 0970 1533A0E1 		mov	r3, r5, asl r3
+ 1184 0974 143084E5 		str	r3, [r4, #20]
+ 1185 0978 690200EA 		b	.L165
+ 1186              	.LVL90:
+ 1187              	.L172:
+ 1188              	.LVL91:
+ 853:../lib/sd_raw.c **** 
+ 854:../lib/sd_raw.c ****                 break;
+ 855:../lib/sd_raw.c ****             case 14:
+ 856:../lib/sd_raw.c ****                 if(b & 0x40)
+ 1189              		.loc 1 856 0
+ 1190 097c 400010E3 		tst	r0, #64
+ 857:../lib/sd_raw.c ****                     info->flag_copy = 1;
+ 1191              		.loc 1 857 0
+ 1192 0980 0130A013 		movne	r3, #1
+ 1193 0984 1830C415 		strneb	r3, [r4, #24]
+ 858:../lib/sd_raw.c ****                 if(b & 0x20)
+ 1194              		.loc 1 858 0
+ 1195 0988 200010E3 		tst	r0, #32
+ 859:../lib/sd_raw.c ****                     info->flag_write_protect = 1;
+ 1196              		.loc 1 859 0
+ 1197 098c 0130A013 		movne	r3, #1
+ 1198 0990 1930C415 		strneb	r3, [r4, #25]
+ 860:../lib/sd_raw.c ****                 if(b & 0x10)
+ 1199              		.loc 1 860 0
+ 1200 0994 100010E3 		tst	r0, #16
+ 861:../lib/sd_raw.c ****                     info->flag_write_protect_temp = 1;
+ 1201              		.loc 1 861 0
+ 1202 0998 0130A013 		movne	r3, #1
+ 1203 099c 1A30C415 		strneb	r3, [r4, #26]
+ 862:../lib/sd_raw.c ****                 info->format = (b & 0x0c) >> 2;
+ 1204              		.loc 1 862 0
+ 1205 09a0 0C3000E2 		and	r3, r0, #12
+ 1206 09a4 4331A0E1 		mov	r3, r3, asr #2
+ 1207 09a8 1B30C4E5 		strb	r3, [r4, #27]
+ 1208              	.L165:
+ 1209 09ac 016086E2 		add	r6, r6, #1
+ 1210              	.LBE7:
+ 1211              		.loc 1 826 0
+ 1212 09b0 120056E3 		cmp	r6, #18
+ 1213 09b4 3502001A 		bne	.L164
+ 863:../lib/sd_raw.c ****                 break;
+ 864:../lib/sd_raw.c ****         }
+ 865:../lib/sd_raw.c ****     }
+ 866:../lib/sd_raw.c **** 
+ 867:../lib/sd_raw.c ****     unselect_card();
+ 1214              		.loc 1 867 0
+ 1215 09b8 20209FE5 		ldr	r2, .L195+4
+ 1216 09bc 003092E5 		ldr	r3, [r2, #0]
+ 1217 09c0 0100A0E3 		mov	r0, #1
+ 1218              	.LVL92:
+ 1219 09c4 803083E3 		orr	r3, r3, #128
+ 1220              	.L194:
+ 1221 09c8 003082E5 		str	r3, [r2, #0]
+ 1222 09cc 730200EA 		b	.L148
+ 1223              	.LVL93:
+ 1224              	.L143:
+ 868:../lib/sd_raw.c **** 
+ 869:../lib/sd_raw.c ****     return 1;
+ 1225              		.loc 1 869 0
+ 1226 09d0 0000A0E3 		mov	r0, #0
+ 1227              	.LVL94:
+ 1228              	.L148:
+ 870:../lib/sd_raw.c **** }
+ 1229              		.loc 1 870 0
+ 1230 09d4 F041BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 1231 09d8 1EFF2FE1 		bx	lr
+ 1232              	.L196:
+ 1233              		.align	2
+ 1234              	.L195:
+ 1235 09dc 0C8002E0 		.word	-536707060
+ 1236 09e0 048002E0 		.word	-536707068
+ 1237              	.LFE12:
+ 1239              		.align	2
+ 1240              		.global	SDoff
+ 1242              	SDoff:
+ 1243              	.LFB13:
+ 871:../lib/sd_raw.c **** 
+ 872:../lib/sd_raw.c **** void SDoff(void)
+ 873:../lib/sd_raw.c **** {
+ 1244              		.loc 1 873 0
+ 1245              		@ Function supports interworking.
+ 1246              		@ args = 0, pretend = 0, frame = 0
+ 1247              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1248              		@ link register save eliminated.
+ 1249              	.LVL95:
+ 874:../lib/sd_raw.c ****     IODIR1 &= ~(CS);
+ 1250              		.loc 1 874 0
+ 1251 09e4 1C209FE5 		ldr	r2, .L199
+ 1252 09e8 003092E5 		ldr	r3, [r2, #0]
+ 1253 09ec 8030C3E3 		bic	r3, r3, #128
+ 1254 09f0 003082E5 		str	r3, [r2, #0]
+ 875:../lib/sd_raw.c ****     PINSEL0 &= ~(0x1500);
+ 1255              		.loc 1 875 0
+ 1256 09f4 10209FE5 		ldr	r2, .L199+4
+ 1257 09f8 003092E5 		ldr	r3, [r2, #0]
+ 1258 09fc 153CC3E3 		bic	r3, r3, #5376
+ 1259              		.loc 1 873 0
+ 1260              		@ lr needed for prologue
+ 1261              		.loc 1 875 0
+ 1262 0a00 003082E5 		str	r3, [r2, #0]
+ 876:../lib/sd_raw.c **** }
+ 1263              		.loc 1 876 0
+ 1264 0a04 1EFF2FE1 		bx	lr
+ 1265              	.L200:
+ 1266              		.align	2
+ 1267              	.L199:
+ 1268 0a08 188002E0 		.word	-536707048
+ 1269 0a0c 00C002E0 		.word	-536690688
+ 1270              	.LFE13:
+ 1272              		.align	2
+ 1273              		.global	format_card
+ 1275              	format_card:
+ 1276              	.LFB14:
+ 877:../lib/sd_raw.c **** 
+ 878:../lib/sd_raw.c **** //NES : 10-28-7 
+ 879:../lib/sd_raw.c **** //Low-level formats a 512MB card
+ 880:../lib/sd_raw.c **** //Assumes *many* things
+ 881:../lib/sd_raw.c **** //You must pass this fuction 0xAA to get it to work (safety check)
+ 882:../lib/sd_raw.c **** char format_card(char make_sure)
+ 883:../lib/sd_raw.c **** {
+ 1277              		.loc 1 883 0
+ 1278              		@ Function supports interworking.
+ 1279              		@ args = 0, pretend = 0, frame = 512
+ 1280              		@ frame_needed = 0, uses_anonymous_args = 0
+ 1281              	.LVL96:
+ 1282 0a10 F0472DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 1283              	.LCFI7:
+ 1284 0a14 FF0000E2 		and	r0, r0, #255
+ 884:../lib/sd_raw.c **** 	#define MBR_LOCATION	0x00
+ 885:../lib/sd_raw.c **** 	#define BR_LOCATION		(MBR_LOCATION+0x80000)
+ 886:../lib/sd_raw.c **** 	#define FAT_TABLE		(BR_LOCATION + (0x200 * 512))
+ 887:../lib/sd_raw.c **** 	#define ROOT_DIR		(BR_LOCATION + (0x0200 * 512) + (0x00F5 * 2 * 512))
+ 888:../lib/sd_raw.c **** 
+ 889:../lib/sd_raw.c **** 	//Safety check
+ 890:../lib/sd_raw.c **** 	if (make_sure != 0xAA) return 0;
+ 1285              		.loc 1 890 0
+ 1286 0a18 AA0050E3 		cmp	r0, #170
+ 1287              		.loc 1 883 0
+ 1288 0a1c 02DC4DE2 		sub	sp, sp, #512
+ 1289              	.LCFI8:
+ 1290              	.LVL97:
+ 1291              		.loc 1 890 0
+ 1292 0a20 0000A013 		movne	r0, #0
+ 1293              	.LVL98:
+ 1294 0a24 F602001A 		bne	.L204
+ 1295 0a28 0040A0E3 		mov	r4, #0
+ 1296              	.LVL99:
+ 1297              	.L205:
+ 891:../lib/sd_raw.c **** 	
+ 892:../lib/sd_raw.c **** 	int i;
+ 893:../lib/sd_raw.c **** 	unsigned char my_buff[512];
+ 894:../lib/sd_raw.c **** 	for(i = 0 ; i < 512 ; i++) my_buff[i] = 0x00;
+ 1298              		.loc 1 894 0
+ 1299 0a2c 0060A0E3 		mov	r6, #0
+ 1300 0a30 0D60C4E7 		strb	r6, [r4, sp]
+ 1301 0a34 014084E2 		add	r4, r4, #1
+ 1302 0a38 020C54E3 		cmp	r4, #512
+ 1303 0a3c 8902001A 		bne	.L205
+ 895:../lib/sd_raw.c **** 	
+ 896:../lib/sd_raw.c **** 	//Init SD card interface
+ 897:../lib/sd_raw.c **** 	sd_raw_init();
+ 1304              		.loc 1 897 0
+ 1305 0a40 FEFFFFEB 		bl	sd_raw_init
+ 898:../lib/sd_raw.c **** 
+ 899:../lib/sd_raw.c **** 	//Erase Master Boot record
+ 900:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1306              		.loc 1 900 0
+ 1307 0a44 FEFFFFEB 		bl	sd_raw_sync
+ 901:../lib/sd_raw.c **** 	sd_raw_write(MBR_LOCATION, my_buff, 512);
+ 1308              		.loc 1 901 0
+ 1309 0a48 0420A0E1 		mov	r2, r4
+ 1310 0a4c 0D10A0E1 		mov	r1, sp
+ 1311 0a50 0600A0E1 		mov	r0, r6
+ 1312 0a54 FEFFFFEB 		bl	sd_raw_write
+ 902:../lib/sd_raw.c **** 
+ 903:../lib/sd_raw.c **** 	//Erase Boot record
+ 904:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1313              		.loc 1 904 0
+ 1314 0a58 FEFFFFEB 		bl	sd_raw_sync
+ 905:../lib/sd_raw.c **** 	sd_raw_write(BR_LOCATION, my_buff, 512);
+ 1315              		.loc 1 905 0
+ 1316 0a5c 0420A0E1 		mov	r2, r4
+ 1317 0a60 0D10A0E1 		mov	r1, sp
+ 1318 0a64 0207A0E3 		mov	r0, #524288
+ 1319 0a68 FEFFFFEB 		bl	sd_raw_write
+ 1320 0a6c 0347A0E3 		mov	r4, #786432
+ 1321              	.LVL100:
+ 1322              	.L207:
+ 906:../lib/sd_raw.c **** 
+ 907:../lib/sd_raw.c **** 	//Erase FAT tables
+ 908:../lib/sd_raw.c **** 	for(i = 0 ; i < 0x00F5 ; i++) //0x00F5 = 245 bytes : comes from byte 0x16 from Boot Record
+ 909:../lib/sd_raw.c **** 	{
+ 910:../lib/sd_raw.c **** 		sd_raw_sync();
+ 1323              		.loc 1 910 0
+ 1324 0a70 FEFFFFEB 		bl	sd_raw_sync
+ 911:../lib/sd_raw.c **** 		sd_raw_write( (FAT_TABLE + (i*512)), my_buff, 512);
+ 1325              		.loc 1 911 0
+ 1326 0a74 0400A0E1 		mov	r0, r4
+ 1327 0a78 0D10A0E1 		mov	r1, sp
+ 1328 0a7c 022CA0E3 		mov	r2, #512
+ 1329 0a80 FEFFFFEB 		bl	sd_raw_write
+ 1330              		.loc 1 908 0
+ 1331 0a84 60319FE5 		ldr	r3, .L214
+ 1332              		.loc 1 911 0
+ 1333 0a88 024C84E2 		add	r4, r4, #512
+ 1334              		.loc 1 908 0
+ 1335 0a8c 030054E1 		cmp	r4, r3
+ 1336              		.loc 1 911 0
+ 1337 0a90 0D90A0E1 		mov	r9, sp
+ 1338              		.loc 1 908 0
+ 1339 0a94 9A02001A 		bne	.L207
+ 912:../lib/sd_raw.c **** 	}
+ 913:../lib/sd_raw.c **** 	
+ 914:../lib/sd_raw.c **** 	//Write Master Boot Record
+ 915:../lib/sd_raw.c **** 	#define PART1	0x01BE
+ 916:../lib/sd_raw.c **** 	my_buff[PART1 + 0] = 0x00;
+ 917:../lib/sd_raw.c **** 	my_buff[PART1 + 1] = 0x00;
+ 918:../lib/sd_raw.c **** 	my_buff[PART1 + 2] = 0x01;
+ 919:../lib/sd_raw.c **** 	my_buff[PART1 + 3] = 0x01;
+ 920:../lib/sd_raw.c **** 	my_buff[PART1 + 4] = 0x06;
+ 1340              		.loc 1 920 0
+ 1341 0a98 0630A0E3 		mov	r3, #6
+ 1342 0a9c C231CDE5 		strb	r3, [sp, #450]
+ 921:../lib/sd_raw.c **** 	my_buff[PART1 + 5] = 0x1F;
+ 1343              		.loc 1 921 0
+ 1344 0aa0 193083E2 		add	r3, r3, #25
+ 1345 0aa4 C331CDE5 		strb	r3, [sp, #451]
+ 922:../lib/sd_raw.c **** 	my_buff[PART1 + 6] = 0xE0;
+ 1346              		.loc 1 922 0
+ 1347 0aa8 1F30E0E3 		mvn	r3, #31
+ 1348              		.loc 1 916 0
+ 1349 0aac 0040A0E3 		mov	r4, #0
+ 1350              		.loc 1 918 0
+ 1351 0ab0 0120A0E3 		mov	r2, #1
+ 923:../lib/sd_raw.c **** 	my_buff[PART1 + 7] = 0xD3;
+ 924:../lib/sd_raw.c **** 	my_buff[PART1 + 8] = 0x00;
+ 925:../lib/sd_raw.c **** 	my_buff[PART1 + 9] = 0x04;
+ 926:../lib/sd_raw.c **** 	my_buff[PART1 + 10] = 0x00;
+ 927:../lib/sd_raw.c **** 	my_buff[PART1 + 11] = 0x00;
+ 928:../lib/sd_raw.c **** 	my_buff[PART1 + 12] = 0x00;
+ 929:../lib/sd_raw.c **** 	my_buff[PART1 + 13] = 0x4C;
+ 930:../lib/sd_raw.c **** 	my_buff[PART1 + 14] = 0x0F;
+ 931:../lib/sd_raw.c **** 	my_buff[510] = 0x55;
+ 1352              		.loc 1 931 0
+ 1353 0ab4 5550A0E3 		mov	r5, #85
+ 1354              		.loc 1 925 0
+ 1355 0ab8 0460A0E3 		mov	r6, #4
+ 1356              		.loc 1 929 0
+ 1357 0abc 4C70A0E3 		mov	r7, #76
+ 1358              		.loc 1 930 0
+ 1359 0ac0 0F80A0E3 		mov	r8, #15
+ 932:../lib/sd_raw.c **** 	my_buff[511] = 0xAA;
+ 1360              		.loc 1 932 0
+ 1361 0ac4 55A0E0E3 		mvn	sl, #85
+ 1362              		.loc 1 922 0
+ 1363 0ac8 C431CDE5 		strb	r3, [sp, #452]
+ 1364              		.loc 1 923 0
+ 1365 0acc 2C30E0E3 		mvn	r3, #44
+ 1366 0ad0 C531CDE5 		strb	r3, [sp, #453]
+ 1367              		.loc 1 919 0
+ 1368 0ad4 C121CDE5 		strb	r2, [sp, #449]
+ 1369              		.loc 1 918 0
+ 1370 0ad8 C021CDE5 		strb	r2, [sp, #448]
+ 1371              		.loc 1 916 0
+ 1372 0adc BE41CDE5 		strb	r4, [sp, #446]
+ 1373              		.loc 1 917 0
+ 1374 0ae0 BF41CDE5 		strb	r4, [sp, #447]
+ 1375              		.loc 1 924 0
+ 1376 0ae4 C641CDE5 		strb	r4, [sp, #454]
+ 1377              		.loc 1 925 0
+ 1378 0ae8 C761CDE5 		strb	r6, [sp, #455]
+ 1379              		.loc 1 926 0
+ 1380 0aec C841CDE5 		strb	r4, [sp, #456]
+ 1381              		.loc 1 927 0
+ 1382 0af0 C941CDE5 		strb	r4, [sp, #457]
+ 1383              		.loc 1 928 0
+ 1384 0af4 CA41CDE5 		strb	r4, [sp, #458]
+ 1385              		.loc 1 929 0
+ 1386 0af8 CB71CDE5 		strb	r7, [sp, #459]
+ 1387              		.loc 1 930 0
+ 1388 0afc CC81CDE5 		strb	r8, [sp, #460]
+ 1389              		.loc 1 931 0
+ 1390 0b00 FE51CDE5 		strb	r5, [sp, #510]
+ 1391              		.loc 1 932 0
+ 1392 0b04 FFA1CDE5 		strb	sl, [sp, #511]
+ 933:../lib/sd_raw.c **** 
+ 934:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1393              		.loc 1 934 0
+ 1394 0b08 FEFFFFEB 		bl	sd_raw_sync
+ 935:../lib/sd_raw.c **** 	sd_raw_write(MBR_LOCATION, my_buff, 512);
+ 1395              		.loc 1 935 0
+ 1396 0b0c 0D10A0E1 		mov	r1, sp
+ 1397 0b10 022CA0E3 		mov	r2, #512
+ 1398 0b14 0400A0E1 		mov	r0, r4
+ 1399 0b18 FEFFFFEB 		bl	sd_raw_write
+ 936:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1400              		.loc 1 936 0
+ 1401 0b1c FEFFFFEB 		bl	sd_raw_sync
+ 937:../lib/sd_raw.c **** 
+ 938:../lib/sd_raw.c **** 	//Write Boot Record
+ 939:../lib/sd_raw.c **** 	#define BOOTRECORD1	0x80000
+ 940:../lib/sd_raw.c **** 	my_buff[0] = 0xEB;
+ 1402              		.loc 1 940 0
+ 1403 0b20 1430E0E3 		mvn	r3, #20
+ 1404 0b24 0030CDE5 		strb	r3, [sp, #0]
+ 941:../lib/sd_raw.c **** 	my_buff[1] = 0xFE;
+ 1405              		.loc 1 941 0
+ 1406 0b28 133083E2 		add	r3, r3, #19
+ 1407 0b2c 0130CDE5 		strb	r3, [sp, #1]
+ 942:../lib/sd_raw.c **** 	my_buff[2] = 0x90;
+ 1408              		.loc 1 942 0
+ 1409 0b30 6F30E0E3 		mvn	r3, #111
+ 1410 0b34 0230CDE5 		strb	r3, [sp, #2]
+ 943:../lib/sd_raw.c **** 	my_buff[12] = 0x02;
+ 944:../lib/sd_raw.c **** 	my_buff[13] = 0x10;
+ 1411              		.loc 1 944 0
+ 1412 0b38 803083E2 		add	r3, r3, #128
+ 1413 0b3c 0D30CDE5 		strb	r3, [sp, #13]
+ 945:../lib/sd_raw.c **** 	my_buff[14] = 0x16;
+ 1414              		.loc 1 945 0
+ 1415 0b40 063083E2 		add	r3, r3, #6
+ 1416 0b44 0E30CDE5 		strb	r3, [sp, #14]
+ 946:../lib/sd_raw.c **** 	my_buff[16] = 0x02;
+ 947:../lib/sd_raw.c **** 	my_buff[18] = 0x02;
+ 948:../lib/sd_raw.c **** 	my_buff[21] = 0xF8;
+ 1417              		.loc 1 948 0
+ 1418 0b48 0730E0E3 		mvn	r3, #7
+ 1419 0b4c 1530CDE5 		strb	r3, [sp, #21]
+ 949:../lib/sd_raw.c **** 	my_buff[22] = 0xF5;
+ 1420              		.loc 1 949 0
+ 1421 0b50 0A30E0E3 		mvn	r3, #10
+ 1422 0b54 1630CDE5 		strb	r3, [sp, #22]
+ 950:../lib/sd_raw.c **** 	my_buff[24] = 0x20;
+ 951:../lib/sd_raw.c **** 	my_buff[26] = 0x20;
+ 952:../lib/sd_raw.c **** 	my_buff[29] = 0x04;
+ 953:../lib/sd_raw.c **** 	my_buff[33] = 0x4C;
+ 954:../lib/sd_raw.c **** 	my_buff[34] = 0x0F;
+ 955:../lib/sd_raw.c **** 	my_buff[38] = 0x29;
+ 1423              		.loc 1 955 0
+ 1424 0b58 343083E2 		add	r3, r3, #52
+ 1425 0b5c 2630CDE5 		strb	r3, [sp, #38]
+ 956:../lib/sd_raw.c **** 	my_buff[54] = 0x46;
+ 1426              		.loc 1 956 0
+ 1427 0b60 1D3083E2 		add	r3, r3, #29
+ 1428 0b64 3630CDE5 		strb	r3, [sp, #54]
+ 957:../lib/sd_raw.c **** 	my_buff[55] = 0x41;
+ 1429              		.loc 1 957 0
+ 1430 0b68 4130A0E3 		mov	r3, #65
+ 1431 0b6c 3730CDE5 		strb	r3, [sp, #55]
+ 958:../lib/sd_raw.c **** 	my_buff[56] = 0x54;
+ 1432              		.loc 1 958 0
+ 1433 0b70 133083E2 		add	r3, r3, #19
+ 1434 0b74 3830CDE5 		strb	r3, [sp, #56]
+ 959:../lib/sd_raw.c **** 	my_buff[57] = 0x31;
+ 1435              		.loc 1 959 0
+ 1436 0b78 3130A0E3 		mov	r3, #49
+ 1437              		.loc 1 950 0
+ 1438 0b7c 2020A0E3 		mov	r2, #32
+ 1439              		.loc 1 943 0
+ 1440 0b80 0210A0E3 		mov	r1, #2
+ 1441              		.loc 1 959 0
+ 1442 0b84 3930CDE5 		strb	r3, [sp, #57]
+ 960:../lib/sd_raw.c **** 	my_buff[58] = 0x36;
+ 1443              		.loc 1 960 0
+ 1444 0b88 053083E2 		add	r3, r3, #5
+ 1445 0b8c 3A30CDE5 		strb	r3, [sp, #58]
+ 1446              		.loc 1 947 0
+ 1447 0b90 1210CDE5 		strb	r1, [sp, #18]
+ 961:../lib/sd_raw.c **** 	my_buff[59] = 0x20;
+ 962:../lib/sd_raw.c **** 	my_buff[60] = 0x20;
+ 963:../lib/sd_raw.c **** 	my_buff[61] = 0x20;
+ 1448              		.loc 1 963 0
+ 1449 0b94 3D20CDE5 		strb	r2, [sp, #61]
+ 1450              		.loc 1 943 0
+ 1451 0b98 0C10CDE5 		strb	r1, [sp, #12]
+ 1452              		.loc 1 946 0
+ 1453 0b9c 1010CDE5 		strb	r1, [sp, #16]
+ 1454              		.loc 1 950 0
+ 1455 0ba0 1820CDE5 		strb	r2, [sp, #24]
+ 1456              		.loc 1 951 0
+ 1457 0ba4 1A20CDE5 		strb	r2, [sp, #26]
+ 1458              		.loc 1 961 0
+ 1459 0ba8 3B20CDE5 		strb	r2, [sp, #59]
+ 1460              		.loc 1 962 0
+ 1461 0bac 3C20CDE5 		strb	r2, [sp, #60]
+ 1462              		.loc 1 952 0
+ 1463 0bb0 1D60CDE5 		strb	r6, [sp, #29]
+ 1464              		.loc 1 953 0
+ 1465 0bb4 2170CDE5 		strb	r7, [sp, #33]
+ 1466              		.loc 1 954 0
+ 1467 0bb8 2280CDE5 		strb	r8, [sp, #34]
+ 964:../lib/sd_raw.c **** 	my_buff[510] = 0x55;
+ 965:../lib/sd_raw.c **** 	my_buff[511] = 0xAA;
+ 1468              		.loc 1 965 0
+ 1469 0bbc FFA1CDE5 		strb	sl, [sp, #511]
+ 1470              		.loc 1 964 0
+ 1471 0bc0 FE51CDE5 		strb	r5, [sp, #510]
+ 966:../lib/sd_raw.c **** 	
+ 967:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1472              		.loc 1 967 0
+ 1473 0bc4 FEFFFFEB 		bl	sd_raw_sync
+ 968:../lib/sd_raw.c **** 	sd_raw_write(BR_LOCATION, my_buff, 512);
+ 1474              		.loc 1 968 0
+ 1475 0bc8 0D10A0E1 		mov	r1, sp
+ 1476 0bcc 022CA0E3 		mov	r2, #512
+ 1477 0bd0 0207A0E3 		mov	r0, #524288
+ 1478 0bd4 FEFFFFEB 		bl	sd_raw_write
+ 969:../lib/sd_raw.c **** 	sd_raw_sync();
+ 1479              		.loc 1 969 0
+ 1480 0bd8 FEFFFFEB 		bl	sd_raw_sync
+ 1481 0bdc 0500A0E1 		mov	r0, r5
+ 1482              	.L204:
+ 970:../lib/sd_raw.c **** 	
+ 971:../lib/sd_raw.c **** 	return(0x55); //Successful format
+ 972:../lib/sd_raw.c **** }
+ 1483              		.loc 1 972 0
+ 1484 0be0 02DC8DE2 		add	sp, sp, #512
+ 1485 0be4 F047BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, r9, sl, lr}
+ 1486 0be8 1EFF2FE1 		bx	lr
+ 1487              	.L215:
+ 1488              		.align	2
+ 1489              	.L214:
+ 1490 0bec 00EA0D00 		.word	911872
+ 1491              	.LFE14:
+ 1493              		.bss
+ 1494              	raw_block_written:
+ 1495 0000 00       		.space	1
+ 1496 0001 000000   		.align	2
+ 1497              	raw_block_address:
+ 1498 0004 00000000 		.space	4
+ 1499              	raw_block:
+ 1500 0008 00000000 		.space	512
+ 1500      00000000 
+ 1500      00000000 
+ 1500      00000000 
+ 1500      00000000 
+ 1748              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 sd_raw.c
+     /tmp/ccuxdKba.s:13     .text:0000000000000000 sd_raw_available
+     /tmp/ccuxdKba.s:23     .text:0000000000000000 $a
+     /tmp/ccuxdKba.s:59     .text:000000000000004c $d
+     /tmp/ccuxdKba.s:66     .text:0000000000000058 sd_raw_rec_byte
+     /tmp/ccuxdKba.s:75     .text:0000000000000058 $a
+     /tmp/ccuxdKba.s:95     .text:0000000000000084 $d
+     /tmp/ccuxdKba.s:102    .text:000000000000008c sd_raw_locked
+     /tmp/ccuxdKba.s:111    .text:000000000000008c $a
+     /tmp/ccuxdKba.s:120    .text:0000000000000094 sd_raw_send_byte
+     /tmp/ccuxdKba.s:147    .text:00000000000000b4 $d
+     /tmp/ccuxdKba.s:153    .text:00000000000000bc sd_raw_send_command_r1
+     /tmp/ccuxdKba.s:160    .text:00000000000000bc $a
+     /tmp/ccuxdKba.s:216    .text:0000000000000134 sd_raw_read
+     /tmp/ccuxdKba.s:374    .text:000000000000029c sd_raw_write
+     /tmp/ccuxdKba.s:362    .text:0000000000000280 $d
+     /tmp/ccuxdKba.s:1497   .bss:0000000000000004 raw_block_address
+     /tmp/ccuxdKba.s:1494   .bss:0000000000000000 raw_block_written
+     /tmp/ccuxdKba.s:1499   .bss:0000000000000008 raw_block
+     /tmp/ccuxdKba.s:381    .text:000000000000029c $a
+     /tmp/ccuxdKba.s:564    .text:0000000000000444 $d
+     /tmp/ccuxdKba.s:593    .text:0000000000000460 sd_raw_init
+     /tmp/ccuxdKba.s:600    .text:0000000000000460 $a
+     /tmp/ccuxdKba.s:800    .text:000000000000064c $d
+     /tmp/ccuxdKba.s:820    .text:0000000000000688 sd_raw_read_interval
+     /tmp/ccuxdKba.s:827    .text:0000000000000688 $a
+     /tmp/ccuxdKba.s:910    .text:0000000000000738 sd_raw_sync
+     /tmp/ccuxdKba.s:943    .text:0000000000000774 $d
+     /tmp/ccuxdKba.s:951    .text:0000000000000780 sd_raw_get_info
+     /tmp/ccuxdKba.s:958    .text:0000000000000780 $a
+     /tmp/ccuxdKba.s:1006   .text:00000000000007f8 $d
+     /tmp/ccuxdKba.s:1024   .text:0000000000000834 $a
+     /tmp/ccuxdKba.s:1123   .text:00000000000008f4 $d
+     /tmp/ccuxdKba.s:1136   .text:000000000000091c $a
+     /tmp/ccuxdKba.s:1235   .text:00000000000009dc $d
+     /tmp/ccuxdKba.s:1242   .text:00000000000009e4 SDoff
+     /tmp/ccuxdKba.s:1251   .text:00000000000009e4 $a
+     /tmp/ccuxdKba.s:1268   .text:0000000000000a08 $d
+     /tmp/ccuxdKba.s:1275   .text:0000000000000a10 format_card
+     /tmp/ccuxdKba.s:1282   .text:0000000000000a10 $a
+     /tmp/ccuxdKba.s:1490   .text:0000000000000bec $d
+
+UNDEFINED SYMBOLS
+memcpy
+rprintf
+memset

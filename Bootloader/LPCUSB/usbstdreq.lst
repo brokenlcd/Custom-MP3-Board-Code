@@ -1,0 +1,910 @@
+   1              		.file	"usbstdreq.c"
+   9              	.Ltext0:
+  10              		.bss
+  11              		.align	2
+  12              	pfnHandleCustomReq:
+  13 0000 00000000 		.space	4
+  14              	bConfiguration:
+  15 0004 00       		.space	1
+  16 0005 000000   		.align	2
+  17              	pabDescrip:
+  18 0008 00000000 		.space	4
+  19              		.text
+  20              		.align	2
+  21              		.global	USBRegisterDescriptors
+  23              	USBRegisterDescriptors:
+  24              	.LFB2:
+  25              		.file 1 "../Bootloader/LPCUSB/usbstdreq.c"
+   1:../Bootloader/LPCUSB/usbstdreq.c **** /*
+   2:../Bootloader/LPCUSB/usbstdreq.c **** 	LPCUSB, an USB device driver for LPC microcontrollers	
+   3:../Bootloader/LPCUSB/usbstdreq.c **** 	Copyright (C) 2006 Bertrik Sikken (bertrik@sikken.nl)
+   4:../Bootloader/LPCUSB/usbstdreq.c **** 
+   5:../Bootloader/LPCUSB/usbstdreq.c **** 	Redistribution and use in source and binary forms, with or without
+   6:../Bootloader/LPCUSB/usbstdreq.c **** 	modification, are permitted provided that the following conditions are met:
+   7:../Bootloader/LPCUSB/usbstdreq.c **** 
+   8:../Bootloader/LPCUSB/usbstdreq.c **** 	1. Redistributions of source code must retain the above copyright
+   9:../Bootloader/LPCUSB/usbstdreq.c **** 	   notice, this list of conditions and the following disclaimer.
+  10:../Bootloader/LPCUSB/usbstdreq.c **** 	2. Redistributions in binary form must reproduce the above copyright
+  11:../Bootloader/LPCUSB/usbstdreq.c **** 	   notice, this list of conditions and the following disclaimer in the
+  12:../Bootloader/LPCUSB/usbstdreq.c **** 	   documentation and/or other materials provided with the distribution.
+  13:../Bootloader/LPCUSB/usbstdreq.c **** 	3. The name of the author may not be used to endorse or promote products
+  14:../Bootloader/LPCUSB/usbstdreq.c **** 	   derived from this software without specific prior written permission.
+  15:../Bootloader/LPCUSB/usbstdreq.c **** 
+  16:../Bootloader/LPCUSB/usbstdreq.c **** 	THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+  17:../Bootloader/LPCUSB/usbstdreq.c **** 	IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+  18:../Bootloader/LPCUSB/usbstdreq.c **** 	OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+  19:../Bootloader/LPCUSB/usbstdreq.c **** 	IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, 
+  20:../Bootloader/LPCUSB/usbstdreq.c **** 	INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+  21:../Bootloader/LPCUSB/usbstdreq.c **** 	NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  22:../Bootloader/LPCUSB/usbstdreq.c **** 	DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  23:../Bootloader/LPCUSB/usbstdreq.c **** 	THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  24:../Bootloader/LPCUSB/usbstdreq.c **** 	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+  25:../Bootloader/LPCUSB/usbstdreq.c **** 	THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  26:../Bootloader/LPCUSB/usbstdreq.c **** */
+  27:../Bootloader/LPCUSB/usbstdreq.c **** 
+  28:../Bootloader/LPCUSB/usbstdreq.c **** 
+  29:../Bootloader/LPCUSB/usbstdreq.c **** /** @file
+  30:../Bootloader/LPCUSB/usbstdreq.c **** 	Standard request handler.
+  31:../Bootloader/LPCUSB/usbstdreq.c **** 	
+  32:../Bootloader/LPCUSB/usbstdreq.c **** 	This modules handles the 'chapter 9' processing, specifically the
+  33:../Bootloader/LPCUSB/usbstdreq.c **** 	standard device requests in table 9-3 from the universal serial bus
+  34:../Bootloader/LPCUSB/usbstdreq.c **** 	specification revision 2.0
+  35:../Bootloader/LPCUSB/usbstdreq.c **** 	
+  36:../Bootloader/LPCUSB/usbstdreq.c **** 	Specific types of devices may specify additional requests (for example
+  37:../Bootloader/LPCUSB/usbstdreq.c **** 	HID devices add a GET_DESCRIPTOR request for interfaces), but they
+  38:../Bootloader/LPCUSB/usbstdreq.c **** 	will not be part of this module.
+  39:../Bootloader/LPCUSB/usbstdreq.c **** 
+  40:../Bootloader/LPCUSB/usbstdreq.c **** 	@todo some requests have to return a request error if device not configured:
+  41:../Bootloader/LPCUSB/usbstdreq.c **** 	@todo GET_INTERFACE, GET_STATUS, SET_INTERFACE, SYNCH_FRAME
+  42:../Bootloader/LPCUSB/usbstdreq.c **** 	@todo this applies to the following if endpoint != 0:
+  43:../Bootloader/LPCUSB/usbstdreq.c **** 	@todo SET_FEATURE, GET_FEATURE 
+  44:../Bootloader/LPCUSB/usbstdreq.c **** */
+  45:../Bootloader/LPCUSB/usbstdreq.c **** 
+  46:../Bootloader/LPCUSB/usbstdreq.c **** #include "type.h"
+  47:../Bootloader/LPCUSB/usbstdreq.c **** #include "usbdebug.h"
+  48:../Bootloader/LPCUSB/usbstdreq.c **** #include "usbstruct.h"
+  49:../Bootloader/LPCUSB/usbstdreq.c **** #include "usbapi.h"
+  50:../Bootloader/LPCUSB/usbstdreq.c **** 
+  51:../Bootloader/LPCUSB/usbstdreq.c **** #define MAX_DESC_HANDLERS	4		/**< device, interface, endpoint, other */
+  52:../Bootloader/LPCUSB/usbstdreq.c **** 
+  53:../Bootloader/LPCUSB/usbstdreq.c **** 
+  54:../Bootloader/LPCUSB/usbstdreq.c **** /* general descriptor field offsets */
+  55:../Bootloader/LPCUSB/usbstdreq.c **** #define DESC_bLength					0	/**< length offset */
+  56:../Bootloader/LPCUSB/usbstdreq.c **** #define DESC_bDescriptorType			1	/**< descriptor type offset */	
+  57:../Bootloader/LPCUSB/usbstdreq.c **** 
+  58:../Bootloader/LPCUSB/usbstdreq.c **** /* config descriptor field offsets */
+  59:../Bootloader/LPCUSB/usbstdreq.c **** #define CONF_DESC_wTotalLength			2	/**< total length offset */
+  60:../Bootloader/LPCUSB/usbstdreq.c **** #define CONF_DESC_bConfigurationValue	5	/**< configuration value offset */	
+  61:../Bootloader/LPCUSB/usbstdreq.c **** #define CONF_DESC_bmAttributes			7	/**< configuration characteristics */
+  62:../Bootloader/LPCUSB/usbstdreq.c **** 
+  63:../Bootloader/LPCUSB/usbstdreq.c **** /* interface descriptor field offsets */
+  64:../Bootloader/LPCUSB/usbstdreq.c **** #define INTF_DESC_bAlternateSetting		3	/**< alternate setting offset */
+  65:../Bootloader/LPCUSB/usbstdreq.c **** 
+  66:../Bootloader/LPCUSB/usbstdreq.c **** /* endpoint descriptor field offsets */
+  67:../Bootloader/LPCUSB/usbstdreq.c **** #define ENDP_DESC_bEndpointAddress		2	/**< endpoint address offset */
+  68:../Bootloader/LPCUSB/usbstdreq.c **** #define ENDP_DESC_wMaxPacketSize		4	/**< maximum packet size offset */
+  69:../Bootloader/LPCUSB/usbstdreq.c **** 
+  70:../Bootloader/LPCUSB/usbstdreq.c **** 
+  71:../Bootloader/LPCUSB/usbstdreq.c **** /** Currently selected configuration */
+  72:../Bootloader/LPCUSB/usbstdreq.c **** static U8				bConfiguration = 0;
+  73:../Bootloader/LPCUSB/usbstdreq.c **** /** Installed custom request handler */
+  74:../Bootloader/LPCUSB/usbstdreq.c **** static TFnHandleRequest	*pfnHandleCustomReq = NULL;
+  75:../Bootloader/LPCUSB/usbstdreq.c **** /** Pointer to registered descriptors */
+  76:../Bootloader/LPCUSB/usbstdreq.c **** //static const U8			*pabDescrip = NULL;
+  77:../Bootloader/LPCUSB/usbstdreq.c **** static U8			*pabDescrip = NULL;
+  78:../Bootloader/LPCUSB/usbstdreq.c **** 
+  79:../Bootloader/LPCUSB/usbstdreq.c **** 
+  80:../Bootloader/LPCUSB/usbstdreq.c **** /**
+  81:../Bootloader/LPCUSB/usbstdreq.c **** 	Registers a pointer to a descriptor block containing all descriptors
+  82:../Bootloader/LPCUSB/usbstdreq.c **** 	for the device.
+  83:../Bootloader/LPCUSB/usbstdreq.c **** 
+  84:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]	pabDescriptors	The descriptor byte array
+  85:../Bootloader/LPCUSB/usbstdreq.c ****  */
+  86:../Bootloader/LPCUSB/usbstdreq.c **** //void USBRegisterDescriptors(const U8 *pabDescriptors)
+  87:../Bootloader/LPCUSB/usbstdreq.c **** void USBRegisterDescriptors(U8 *pabDescriptors)
+  88:../Bootloader/LPCUSB/usbstdreq.c **** {
+  26              		.loc 1 88 0
+  27              		@ Function supports interworking.
+  28              		@ args = 0, pretend = 0, frame = 0
+  29              		@ frame_needed = 0, uses_anonymous_args = 0
+  30              		@ link register save eliminated.
+  31              	.LVL0:
+  89:../Bootloader/LPCUSB/usbstdreq.c **** 	pabDescrip = pabDescriptors;
+  32              		.loc 1 89 0
+  33 0000 04309FE5 		ldr	r3, .L3
+  34              		.loc 1 88 0
+  35              		@ lr needed for prologue
+  36              		.loc 1 89 0
+  37 0004 000083E5 		str	r0, [r3, #0]
+  90:../Bootloader/LPCUSB/usbstdreq.c **** }
+  38              		.loc 1 90 0
+  39 0008 1EFF2FE1 		bx	lr
+  40              	.L4:
+  41              		.align	2
+  42              	.L3:
+  43 000c 08000000 		.word	pabDescrip
+  44              	.LFE2:
+  46              		.align	2
+  47              		.global	USBGetDescriptor
+  49              	USBGetDescriptor:
+  50              	.LFB3:
+  91:../Bootloader/LPCUSB/usbstdreq.c **** 
+  92:../Bootloader/LPCUSB/usbstdreq.c **** 
+  93:../Bootloader/LPCUSB/usbstdreq.c **** /**
+  94:../Bootloader/LPCUSB/usbstdreq.c **** 	Parses the list of installed USB descriptors and attempts to find
+  95:../Bootloader/LPCUSB/usbstdreq.c **** 	the specified USB descriptor.
+  96:../Bootloader/LPCUSB/usbstdreq.c **** 		
+  97:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		wTypeIndex	Type and index of the descriptor
+  98:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		wLangID		Language ID of the descriptor (currently unused)
+  99:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [out]	*piLen		Descriptor length
+ 100:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [out]	*ppbData	Descriptor data
+ 101:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 102:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if the descriptor was found, FALSE otherwise
+ 103:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 104:../Bootloader/LPCUSB/usbstdreq.c **** BOOL USBGetDescriptor(U16 wTypeIndex, U16 wLangID, int *piLen, U8 **ppbData)
+ 105:../Bootloader/LPCUSB/usbstdreq.c **** {
+  51              		.loc 1 105 0
+  52              		@ Function supports interworking.
+  53              		@ args = 0, pretend = 0, frame = 0
+  54              		@ frame_needed = 0, uses_anonymous_args = 0
+  55              	.LVL1:
+  56 0010 30402DE9 		stmfd	sp!, {r4, r5, lr}
+  57              	.LCFI0:
+ 106:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	bType, bIndex;
+ 107:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	*pab;
+ 108:../Bootloader/LPCUSB/usbstdreq.c **** 	int iCurIndex;
+ 109:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 110:../Bootloader/LPCUSB/usbstdreq.c **** 	ASSERT(pabDescrip != NULL);
+ 111:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 112:../Bootloader/LPCUSB/usbstdreq.c **** 	bType = GET_DESC_TYPE(wTypeIndex);
+ 113:../Bootloader/LPCUSB/usbstdreq.c **** 	bIndex = GET_DESC_INDEX(wTypeIndex);
+ 114:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 115:../Bootloader/LPCUSB/usbstdreq.c **** 	pab = (U8 *)pabDescrip;
+  58              		.loc 1 115 0
+  59 0014 74109FE5 		ldr	r1, .L18
+  60              	.LVL2:
+  61              		.loc 1 105 0
+  62 0018 0008A0E1 		mov	r0, r0, asl #16
+  63              	.LVL3:
+  64              		.loc 1 115 0
+  65 001c 00C091E5 		ldr	ip, [r1, #0]
+  66              	.LVL4:
+  67              		.loc 1 105 0
+  68 0020 2018A0E1 		mov	r1, r0, lsr #16
+  69              	.LVL5:
+  70 0024 0250A0E1 		mov	r5, r2
+  71 0028 0340A0E1 		mov	r4, r3
+  72              		.loc 1 112 0
+  73 002c 20ECA0E1 		mov	lr, r0, lsr #24
+  74              	.LVL6:
+  75              		.loc 1 113 0
+  76 0030 FF1001E2 		and	r1, r1, #255
+  77              	.LVL7:
+  78              		.loc 1 115 0
+  79 0034 0020A0E3 		mov	r2, #0
+  80              	.LVL8:
+  81 0038 1D0000EA 		b	.L6
+  82              	.LVL9:
+  83              	.L7:
+ 116:../Bootloader/LPCUSB/usbstdreq.c **** 	iCurIndex = 0;
+ 117:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 118:../Bootloader/LPCUSB/usbstdreq.c **** 	while (pab[DESC_bLength] != 0) {
+ 119:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pab[DESC_bDescriptorType] == bType) {
+  84              		.loc 1 119 0
+  85 003c 0130DCE5 		ldrb	r3, [ip, #1]	@ zero_extendqisi2
+  86 0040 0E0053E1 		cmp	r3, lr
+  87 0044 1C00001A 		bne	.L8
+ 120:../Bootloader/LPCUSB/usbstdreq.c **** 			if (iCurIndex == bIndex) {
+  88              		.loc 1 120 0
+  89 0048 010052E1 		cmp	r2, r1
+ 121:../Bootloader/LPCUSB/usbstdreq.c **** 				// set data pointer
+ 122:../Bootloader/LPCUSB/usbstdreq.c **** 				*ppbData = pab;
+ 123:../Bootloader/LPCUSB/usbstdreq.c **** 				// get length from structure
+ 124:../Bootloader/LPCUSB/usbstdreq.c **** 				if (bType == DESC_CONFIGURATION) {
+ 125:../Bootloader/LPCUSB/usbstdreq.c **** 					// configuration descriptor is an exception, length is at offset 2 and 3
+ 126:../Bootloader/LPCUSB/usbstdreq.c **** 					*piLen =	(pab[CONF_DESC_wTotalLength]) |
+ 127:../Bootloader/LPCUSB/usbstdreq.c **** 								(pab[CONF_DESC_wTotalLength + 1] << 8);
+ 128:../Bootloader/LPCUSB/usbstdreq.c **** 				}
+ 129:../Bootloader/LPCUSB/usbstdreq.c **** 				else {
+ 130:../Bootloader/LPCUSB/usbstdreq.c **** 					// normally length is at offset 0
+ 131:../Bootloader/LPCUSB/usbstdreq.c **** 					*piLen = pab[DESC_bLength];
+ 132:../Bootloader/LPCUSB/usbstdreq.c **** 				}
+ 133:../Bootloader/LPCUSB/usbstdreq.c **** 				return TRUE;
+ 134:../Bootloader/LPCUSB/usbstdreq.c **** 			}
+ 135:../Bootloader/LPCUSB/usbstdreq.c **** 			iCurIndex++;
+  90              		.loc 1 135 0
+  91 004c 012082E2 		add	r2, r2, #1
+  92              		.loc 1 120 0
+  93 0050 1C00001A 		bne	.L8
+  94              		.loc 1 122 0
+  95 0054 00C084E5 		str	ip, [r4, #0]
+  96              		.loc 1 124 0
+  97 0058 02005EE3 		cmp	lr, #2
+  98              		.loc 1 126 0
+  99 005c 0320DC05 		ldreqb	r2, [ip, #3]	@ zero_extendqisi2
+ 100              	.LVL10:
+ 101 0060 0230DC05 		ldreqb	r3, [ip, #2]	@ zero_extendqisi2
+ 102              		.loc 1 131 0
+ 103 0064 0030DC15 		ldrneb	r3, [ip, #0]	@ zero_extendqisi2
+ 104              		.loc 1 126 0
+ 105 0068 02348301 		orreq	r3, r3, r2, asl #8
+ 106              		.loc 1 131 0
+ 107 006c 0100A0E3 		mov	r0, #1
+ 108 0070 003085E5 		str	r3, [r5, #0]
+ 109 0074 200000EA 		b	.L14
+ 110              	.LVL11:
+ 111              	.L8:
+ 136:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 137:../Bootloader/LPCUSB/usbstdreq.c **** 		// skip to next descriptor
+ 138:../Bootloader/LPCUSB/usbstdreq.c **** 		pab += pab[DESC_bLength];
+ 112              		.loc 1 138 0
+ 113 0078 00C08CE0 		add	ip, ip, r0
+ 114              	.LVL12:
+ 115              	.L6:
+ 116              		.loc 1 118 0
+ 117 007c 0000DCE5 		ldrb	r0, [ip, #0]	@ zero_extendqisi2
+ 118 0080 000050E3 		cmp	r0, #0
+ 119 0084 0D00001A 		bne	.L7
+ 120              	.L14:
+ 139:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 140:../Bootloader/LPCUSB/usbstdreq.c **** 	// nothing found
+ 141:../Bootloader/LPCUSB/usbstdreq.c **** 	DBG("Desc %x not found!\n", wTypeIndex);
+ 142:../Bootloader/LPCUSB/usbstdreq.c **** 	return FALSE;
+ 143:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 121              		.loc 1 143 0
+ 122 0088 3040BDE8 		ldmfd	sp!, {r4, r5, lr}
+ 123 008c 1EFF2FE1 		bx	lr
+ 124              	.L19:
+ 125              		.align	2
+ 126              	.L18:
+ 127 0090 08000000 		.word	pabDescrip
+ 128              	.LFE3:
+ 130              		.align	2
+ 131              		.global	USBHandleStandardRequest
+ 133              	USBHandleStandardRequest:
+ 134              	.LFB8:
+ 144:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 145:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 146:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 147:../Bootloader/LPCUSB/usbstdreq.c **** 	Configures the device according to the specified configuration index and
+ 148:../Bootloader/LPCUSB/usbstdreq.c **** 	alternate setting by parsing the installed USB descriptor list.
+ 149:../Bootloader/LPCUSB/usbstdreq.c **** 	A configuration index of 0 unconfigures the device.
+ 150:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 151:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		bConfigIndex	Configuration index
+ 152:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		bAltSetting		Alternate setting number
+ 153:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 154:../Bootloader/LPCUSB/usbstdreq.c **** 	@todo function always returns TRUE, add stricter checking?
+ 155:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 156:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if successfully configured, FALSE otherwise
+ 157:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 158:../Bootloader/LPCUSB/usbstdreq.c **** static BOOL USBSetConfiguration(U8 bConfigIndex, U8 bAltSetting)
+ 159:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 160:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	*pab;
+ 161:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	bCurConfig, bCurAltSetting;
+ 162:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	bEP;
+ 163:../Bootloader/LPCUSB/usbstdreq.c **** 	U16	wMaxPktSize;
+ 164:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 165:../Bootloader/LPCUSB/usbstdreq.c **** 	ASSERT(pabDescrip != NULL);
+ 166:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 167:../Bootloader/LPCUSB/usbstdreq.c **** 	if (bConfigIndex == 0) {
+ 168:../Bootloader/LPCUSB/usbstdreq.c **** 		// unconfigure device
+ 169:../Bootloader/LPCUSB/usbstdreq.c **** 		USBHwConfigDevice(FALSE);
+ 170:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 171:../Bootloader/LPCUSB/usbstdreq.c **** 	else {
+ 172:../Bootloader/LPCUSB/usbstdreq.c **** 		// configure endpoints for this configuration/altsetting
+ 173:../Bootloader/LPCUSB/usbstdreq.c **** 		pab = (U8 *)pabDescrip;
+ 174:../Bootloader/LPCUSB/usbstdreq.c **** 		bCurConfig = 0xFF;
+ 175:../Bootloader/LPCUSB/usbstdreq.c **** 		bCurAltSetting = 0xFF;
+ 176:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 177:../Bootloader/LPCUSB/usbstdreq.c **** 		while (pab[DESC_bLength] != 0) {
+ 178:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 179:../Bootloader/LPCUSB/usbstdreq.c **** 			switch (pab[DESC_bDescriptorType]) {
+ 180:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 181:../Bootloader/LPCUSB/usbstdreq.c **** 			case DESC_CONFIGURATION:
+ 182:../Bootloader/LPCUSB/usbstdreq.c **** 				// remember current configuration index
+ 183:../Bootloader/LPCUSB/usbstdreq.c **** 				bCurConfig = pab[CONF_DESC_bConfigurationValue];
+ 184:../Bootloader/LPCUSB/usbstdreq.c **** 				break;
+ 185:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 186:../Bootloader/LPCUSB/usbstdreq.c **** 			case DESC_INTERFACE:
+ 187:../Bootloader/LPCUSB/usbstdreq.c **** 				// remember current alternate setting
+ 188:../Bootloader/LPCUSB/usbstdreq.c **** 				bCurAltSetting = pab[INTF_DESC_bAlternateSetting];
+ 189:../Bootloader/LPCUSB/usbstdreq.c **** 				break;
+ 190:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 191:../Bootloader/LPCUSB/usbstdreq.c **** 			case DESC_ENDPOINT:
+ 192:../Bootloader/LPCUSB/usbstdreq.c **** 				if ((bCurConfig == bConfigIndex) &&
+ 193:../Bootloader/LPCUSB/usbstdreq.c **** 					(bCurAltSetting == bAltSetting)) {
+ 194:../Bootloader/LPCUSB/usbstdreq.c **** 					// endpoint found for desired config and alternate setting
+ 195:../Bootloader/LPCUSB/usbstdreq.c **** 					bEP = pab[ENDP_DESC_bEndpointAddress];
+ 196:../Bootloader/LPCUSB/usbstdreq.c **** 					wMaxPktSize = 	(pab[ENDP_DESC_wMaxPacketSize]) |
+ 197:../Bootloader/LPCUSB/usbstdreq.c **** 									(pab[ENDP_DESC_wMaxPacketSize + 1] << 8);
+ 198:../Bootloader/LPCUSB/usbstdreq.c **** 					// configure endpoint
+ 199:../Bootloader/LPCUSB/usbstdreq.c **** 					USBHwEPConfig(bEP, wMaxPktSize);
+ 200:../Bootloader/LPCUSB/usbstdreq.c **** 				}
+ 201:../Bootloader/LPCUSB/usbstdreq.c **** 				break;
+ 202:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 203:../Bootloader/LPCUSB/usbstdreq.c **** 			default:
+ 204:../Bootloader/LPCUSB/usbstdreq.c **** 				break;
+ 205:../Bootloader/LPCUSB/usbstdreq.c **** 			}
+ 206:../Bootloader/LPCUSB/usbstdreq.c **** 			// skip to next descriptor
+ 207:../Bootloader/LPCUSB/usbstdreq.c **** 			pab += pab[DESC_bLength];
+ 208:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 209:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 210:../Bootloader/LPCUSB/usbstdreq.c **** 		// configure device
+ 211:../Bootloader/LPCUSB/usbstdreq.c **** 		USBHwConfigDevice(TRUE);
+ 212:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 213:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 214:../Bootloader/LPCUSB/usbstdreq.c **** 	return TRUE;
+ 215:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 216:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 217:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 218:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 219:../Bootloader/LPCUSB/usbstdreq.c **** 	Local function to handle a standard device request
+ 220:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 221:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		pSetup		The setup packet
+ 222:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in,out]	*piLen		Pointer to data length
+ 223:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in,out]	ppbData		Data buffer.
+ 224:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 225:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if the request was handled successfully
+ 226:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 227:../Bootloader/LPCUSB/usbstdreq.c **** static BOOL HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, U8 **ppbData)
+ 228:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 229:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	*pbData = *ppbData;
+ 230:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 231:../Bootloader/LPCUSB/usbstdreq.c **** 	switch (pSetup->bRequest) {
+ 232:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 233:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_STATUS:
+ 234:../Bootloader/LPCUSB/usbstdreq.c **** 		// bit 0: self-powered
+ 235:../Bootloader/LPCUSB/usbstdreq.c **** 		// bit 1: remote wakeup = not supported
+ 236:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[0] = 0;
+ 237:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[1] = 0;
+ 238:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 2;
+ 239:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 240:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 241:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_ADDRESS:
+ 242:../Bootloader/LPCUSB/usbstdreq.c **** 		USBHwSetAddress(pSetup->wValue);
+ 243:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 244:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 245:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_DESCRIPTOR:
+ 246:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("D%x", pSetup->wValue);
+ 247:../Bootloader/LPCUSB/usbstdreq.c **** 		return USBGetDescriptor(pSetup->wValue, pSetup->wIndex, piLen, ppbData);
+ 248:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 249:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_CONFIGURATION:
+ 250:../Bootloader/LPCUSB/usbstdreq.c **** 		// indicate if we are configured
+ 251:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[0] = bConfiguration;
+ 252:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 1;
+ 253:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 254:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 255:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_CONFIGURATION:
+ 256:../Bootloader/LPCUSB/usbstdreq.c **** 		if (!USBSetConfiguration(pSetup->wValue & 0xFF, 0)) {
+ 257:../Bootloader/LPCUSB/usbstdreq.c **** 			DBG("USBSetConfiguration failed!\n");
+ 258:../Bootloader/LPCUSB/usbstdreq.c **** 			return FALSE;
+ 259:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 260:../Bootloader/LPCUSB/usbstdreq.c **** 		// configuration successful, update current configuration
+ 261:../Bootloader/LPCUSB/usbstdreq.c **** 		bConfiguration = pSetup->wValue & 0xFF;	
+ 262:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 263:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 264:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_CLEAR_FEATURE:
+ 265:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_FEATURE:
+ 266:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pSetup->wValue == FEA_REMOTE_WAKEUP) {
+ 267:../Bootloader/LPCUSB/usbstdreq.c **** 			// put DEVICE_REMOTE_WAKEUP code here
+ 268:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 269:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pSetup->wValue == FEA_TEST_MODE) {
+ 270:../Bootloader/LPCUSB/usbstdreq.c **** 			// put TEST_MODE code here
+ 271:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 272:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 273:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 274:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_DESCRIPTOR:
+ 275:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("Device req %d not implemented\n", pSetup->bRequest);
+ 276:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 277:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 278:../Bootloader/LPCUSB/usbstdreq.c **** 	default:
+ 279:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("Illegal device req %d\n", pSetup->bRequest);
+ 280:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 281:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 282:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 283:../Bootloader/LPCUSB/usbstdreq.c **** 	return TRUE;
+ 284:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 285:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 286:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 287:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 288:../Bootloader/LPCUSB/usbstdreq.c **** 	Local function to handle a standard interface request
+ 289:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 290:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		pSetup		The setup packet
+ 291:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in,out]	*piLen		Pointer to data length
+ 292:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		ppbData		Data buffer.
+ 293:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 294:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if the request was handled successfully
+ 295:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 296:../Bootloader/LPCUSB/usbstdreq.c **** static BOOL HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, U8 **ppbData)
+ 297:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 298:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	*pbData = *ppbData;
+ 299:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 300:../Bootloader/LPCUSB/usbstdreq.c **** 	switch (pSetup->bRequest) {
+ 301:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 302:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_STATUS:
+ 303:../Bootloader/LPCUSB/usbstdreq.c **** 		// no bits specified
+ 304:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[0] = 0;
+ 305:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[1] = 0;
+ 306:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 2;
+ 307:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 308:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 309:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_CLEAR_FEATURE:
+ 310:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_FEATURE:
+ 311:../Bootloader/LPCUSB/usbstdreq.c **** 		// not defined for interface
+ 312:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 313:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 314:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_INTERFACE:	// TODO use bNumInterfaces
+ 315:../Bootloader/LPCUSB/usbstdreq.c ****         // there is only one interface, return n-1 (= 0)
+ 316:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[0] = 0;
+ 317:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 1;
+ 318:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 319:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 320:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_INTERFACE:	// TODO use bNumInterfaces
+ 321:../Bootloader/LPCUSB/usbstdreq.c **** 		// there is only one interface (= 0)
+ 322:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pSetup->wValue != 0) {
+ 323:../Bootloader/LPCUSB/usbstdreq.c **** 			return FALSE;
+ 324:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 325:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 0;
+ 326:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 327:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 328:../Bootloader/LPCUSB/usbstdreq.c **** 	default:
+ 329:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("Illegal interface req %d\n", pSetup->bRequest);
+ 330:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 331:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 332:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 333:../Bootloader/LPCUSB/usbstdreq.c **** 	return TRUE;
+ 334:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 335:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 336:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 337:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 338:../Bootloader/LPCUSB/usbstdreq.c **** 	Local function to handle a standard endpoint request
+ 339:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 340:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		pSetup		The setup packet
+ 341:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in,out]	*piLen		Pointer to data length
+ 342:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		ppbData		Data buffer.
+ 343:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 344:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if the request was handled successfully
+ 345:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 346:../Bootloader/LPCUSB/usbstdreq.c **** static BOOL HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, U8 **ppbData)
+ 347:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 348:../Bootloader/LPCUSB/usbstdreq.c **** 	U8	*pbData = *ppbData;
+ 349:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 350:../Bootloader/LPCUSB/usbstdreq.c **** 	switch (pSetup->bRequest) {
+ 351:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_GET_STATUS:
+ 352:../Bootloader/LPCUSB/usbstdreq.c **** 		// bit 0 = endpointed halted or not
+ 353:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[0] = (USBHwEPGetStatus(pSetup->wIndex) & EP_STATUS_STALLED) ? 1 : 0;
+ 354:../Bootloader/LPCUSB/usbstdreq.c **** 		pbData[1] = 0;
+ 355:../Bootloader/LPCUSB/usbstdreq.c **** 		*piLen = 2;
+ 356:../Bootloader/LPCUSB/usbstdreq.c **** 		break;
+ 357:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 358:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_CLEAR_FEATURE:
+ 359:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pSetup->wValue == FEA_ENDPOINT_HALT) {
+ 360:../Bootloader/LPCUSB/usbstdreq.c **** 			// clear HALT by unstalling
+ 361:../Bootloader/LPCUSB/usbstdreq.c **** 			USBHwEPStall(pSetup->wIndex, FALSE);
+ 362:../Bootloader/LPCUSB/usbstdreq.c **** 			break;
+ 363:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 364:../Bootloader/LPCUSB/usbstdreq.c **** 		// only ENDPOINT_HALT defined for endpoints
+ 365:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 366:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 367:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SET_FEATURE:
+ 368:../Bootloader/LPCUSB/usbstdreq.c **** 		if (pSetup->wValue == FEA_ENDPOINT_HALT) {
+ 369:../Bootloader/LPCUSB/usbstdreq.c **** 			// set HALT by stalling
+ 370:../Bootloader/LPCUSB/usbstdreq.c **** 			USBHwEPStall(pSetup->wIndex, TRUE);
+ 371:../Bootloader/LPCUSB/usbstdreq.c **** 			break;
+ 372:../Bootloader/LPCUSB/usbstdreq.c **** 		}
+ 373:../Bootloader/LPCUSB/usbstdreq.c **** 		// only ENDPOINT_HALT defined for endpoints
+ 374:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 375:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 376:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQ_SYNCH_FRAME:
+ 377:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("EP req %d not implemented\n", pSetup->bRequest);
+ 378:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 379:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 380:../Bootloader/LPCUSB/usbstdreq.c **** 	default:
+ 381:../Bootloader/LPCUSB/usbstdreq.c **** 		DBG("Illegal EP req %d\n", pSetup->bRequest);
+ 382:../Bootloader/LPCUSB/usbstdreq.c **** 		return FALSE;
+ 383:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 384:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 385:../Bootloader/LPCUSB/usbstdreq.c **** 	return TRUE;
+ 386:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 387:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 388:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 389:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 390:../Bootloader/LPCUSB/usbstdreq.c **** 	Default handler for standard ('chapter 9') requests
+ 391:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 392:../Bootloader/LPCUSB/usbstdreq.c **** 	If a custom request handler was installed, this handler is called first.
+ 393:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 394:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		pSetup		The setup packet
+ 395:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in,out]	*piLen		Pointer to data length
+ 396:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]		ppbData		Data buffer.
+ 397:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 398:../Bootloader/LPCUSB/usbstdreq.c **** 	@return TRUE if the request was handled successfully
+ 399:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 400:../Bootloader/LPCUSB/usbstdreq.c **** BOOL USBHandleStandardRequest(TSetupPacket	*pSetup, int *piLen, U8 **ppbData)
+ 401:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 135              		.loc 1 401 0
+ 136              		@ Function supports interworking.
+ 137              		@ args = 0, pretend = 0, frame = 0
+ 138              		@ frame_needed = 0, uses_anonymous_args = 0
+ 139              	.LVL13:
+ 140 0094 F0412DE9 		stmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 141              	.LCFI1:
+ 402:../Bootloader/LPCUSB/usbstdreq.c **** 	// try the custom request handler first
+ 403:../Bootloader/LPCUSB/usbstdreq.c **** 	if ((pfnHandleCustomReq != NULL) && pfnHandleCustomReq(pSetup, piLen, ppbData)) {
+ 142              		.loc 1 403 0
+ 143 0098 60329FE5 		ldr	r3, .L60
+ 144 009c 003093E5 		ldr	r3, [r3, #0]
+ 145 00a0 000053E3 		cmp	r3, #0
+ 146              		.loc 1 401 0
+ 147 00a4 0050A0E1 		mov	r5, r0
+ 148 00a8 0180A0E1 		mov	r8, r1
+ 149 00ac 0270A0E1 		mov	r7, r2
+ 150              		.loc 1 403 0
+ 151 00b0 2F00000A 		beq	.L21
+ 152              	.LVL14:
+ 153 00b4 0FE0A0E1 		mov	lr, pc
+ 154 00b8 13FF2FE1 		bx	r3
+ 155 00bc 000050E3 		cmp	r0, #0
+ 156 00c0 4E00001A 		bne	.L57
+ 157              	.LVL15:
+ 158              	.L21:
+ 404:../Bootloader/LPCUSB/usbstdreq.c **** 		return TRUE;
+ 405:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 406:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 407:../Bootloader/LPCUSB/usbstdreq.c **** 	switch (REQTYPE_GET_RECIP(pSetup->bmRequestType)) {
+ 159              		.loc 1 407 0
+ 160 00c4 0030D5E5 		ldrb	r3, [r5, #0]	@ zero_extendqisi2
+ 161 00c8 1F4003E2 		and	r4, r3, #31
+ 162 00cc 010054E3 		cmp	r4, #1
+ 163 00d0 8200000A 		beq	.L27
+ 164 00d4 020054E3 		cmp	r4, #2
+ 165 00d8 9A00000A 		beq	.L28
+ 166 00dc 000054E3 		cmp	r4, #0
+ 167 00e0 BA00001A 		bne	.L25
+ 168              	.LBB2:
+ 169              	.LBB3:
+ 170              		.loc 1 231 0
+ 171 00e4 0130D5E5 		ldrb	r3, [r5, #1]	@ zero_extendqisi2
+ 172              		.loc 1 229 0
+ 173 00e8 001097E5 		ldr	r1, [r7, #0]
+ 174              	.LVL16:
+ 175              		.loc 1 231 0
+ 176 00ec 090053E3 		cmp	r3, #9
+ 177 00f0 03F19F97 		ldrls	pc, [pc, r3, asl #2]
+ 178 00f4 BA0000EA 		b	.L25
+ 179              		.p2align 2
+ 180              	.L34:
+ 181 00f8 20010000 		.word	.L29
+ 182 00fc F0020000 		.word	.L25
+ 183 0100 F0020000 		.word	.L25
+ 184 0104 F0020000 		.word	.L25
+ 185 0108 F0020000 		.word	.L25
+ 186 010c 38010000 		.word	.L30
+ 187 0110 48010000 		.word	.L31
+ 188 0114 F0020000 		.word	.L25
+ 189 0118 60010000 		.word	.L32
+ 190 011c 7C010000 		.word	.L33
+ 191              	.L29:
+ 192              		.loc 1 236 0
+ 193 0120 0030A0E3 		mov	r3, #0
+ 194              		.loc 1 237 0
+ 195 0124 0130C1E5 		strb	r3, [r1, #1]
+ 196              		.loc 1 236 0
+ 197 0128 0030C1E5 		strb	r3, [r1, #0]
+ 198              		.loc 1 238 0
+ 199 012c 01C0A0E3 		mov	ip, #1
+ 200 0130 023083E2 		add	r3, r3, #2
+ 201 0134 5B0000EA 		b	.L58
+ 202              	.L30:
+ 203              		.loc 1 242 0
+ 204 0138 0200D5E5 		ldrb	r0, [r5, #2]	@ zero_extendqisi2
+ 205 013c FEFFFFEB 		bl	USBHwSetAddress
+ 206              	.LVL17:
+ 207              	.L57:
+ 208 0140 01C0A0E3 		mov	ip, #1
+ 209 0144 BB0000EA 		b	.L24
+ 210              	.LVL18:
+ 211              	.L31:
+ 212              		.loc 1 247 0
+ 213 0148 B410D5E1 		ldrh	r1, [r5, #4]
+ 214              	.LVL19:
+ 215 014c B200D5E1 		ldrh	r0, [r5, #2]
+ 216 0150 0820A0E1 		mov	r2, r8
+ 217 0154 0730A0E1 		mov	r3, r7
+ 218              	.LBE3:
+ 219              	.LBE2:
+ 408:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQTYPE_RECIP_DEVICE:		return HandleStdDeviceReq(pSetup, piLen, ppbData);
+ 409:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQTYPE_RECIP_INTERFACE:	return HandleStdInterfaceReq(pSetup, piLen, ppbData);
+ 410:../Bootloader/LPCUSB/usbstdreq.c **** 	case REQTYPE_RECIP_ENDPOINT: 	return HandleStdEndPointReq(pSetup, piLen, ppbData);
+ 411:../Bootloader/LPCUSB/usbstdreq.c **** 	default: 						return FALSE;
+ 412:../Bootloader/LPCUSB/usbstdreq.c **** 	}
+ 413:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 220              		.loc 1 413 0
+ 221 0158 F041BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 222              	.LBB4:
+ 223              	.LBB5:
+ 224              		.loc 1 247 0
+ 225 015c FEFFFFEA 		b	USBGetDescriptor
+ 226              	.LVL20:
+ 227              	.L32:
+ 228              		.loc 1 251 0
+ 229 0160 9C319FE5 		ldr	r3, .L60+4
+ 230 0164 0020D3E5 		ldrb	r2, [r3, #0]	@ zero_extendqisi2
+ 231              		.loc 1 252 0
+ 232 0168 0130A0E3 		mov	r3, #1
+ 233              		.loc 1 251 0
+ 234 016c 0020C1E5 		strb	r2, [r1, #0]
+ 235              		.loc 1 252 0
+ 236 0170 03C0A0E1 		mov	ip, r3
+ 237              	.LVL21:
+ 238              	.L58:
+ 239 0174 003088E5 		str	r3, [r8, #0]
+ 240 0178 BB0000EA 		b	.L24
+ 241              	.LVL22:
+ 242              	.L33:
+ 243              		.loc 1 253 0
+ 244 017c 0260D5E5 		ldrb	r6, [r5, #2]	@ zero_extendqisi2
+ 245              	.LVL23:
+ 246              	.LBB6:
+ 247              	.LBB7:
+ 248              		.loc 1 167 0
+ 249 0180 000056E3 		cmp	r6, #0
+ 250              		.loc 1 169 0
+ 251 0184 0600A001 		moveq	r0, r6
+ 252              		.loc 1 167 0
+ 253 0188 7C00000A 		beq	.L56
+ 254              	.LVL24:
+ 255              		.loc 1 173 0
+ 256 018c 74319FE5 		ldr	r3, .L60+8
+ 257 0190 FF70A0E3 		mov	r7, #255
+ 258              	.LVL25:
+ 259 0194 004093E5 		ldr	r4, [r3, #0]
+ 260              	.LVL26:
+ 261 0198 0780A0E1 		mov	r8, r7
+ 262              	.LVL27:
+ 263 019c 780000EA 		b	.L38
+ 264              	.L39:
+ 265              		.loc 1 179 0
+ 266 01a0 0130D4E5 		ldrb	r3, [r4, #1]	@ zero_extendqisi2
+ 267 01a4 040053E3 		cmp	r3, #4
+ 268              		.loc 1 188 0
+ 269 01a8 0370D405 		ldreqb	r7, [r4, #3]	@ zero_extendqisi2
+ 270              		.loc 1 179 0
+ 271 01ac 7600000A 		beq	.L40
+ 272 01b0 050053E3 		cmp	r3, #5
+ 273 01b4 6F00000A 		beq	.L43
+ 274 01b8 020053E3 		cmp	r3, #2
+ 275              		.loc 1 183 0
+ 276 01bc 0580D405 		ldreqb	r8, [r4, #5]	@ zero_extendqisi2
+ 277 01c0 760000EA 		b	.L40
+ 278              	.L43:
+ 279              		.loc 1 192 0
+ 280 01c4 060058E1 		cmp	r8, r6
+ 281 01c8 00005703 		cmpeq	r7, #0
+ 282              	.LVL28:
+ 283              		.loc 1 199 0
+ 284 01cc 0430D405 		ldreqb	r3, [r4, #4]	@ zero_extendqisi2
+ 285 01d0 0510D405 		ldreqb	r1, [r4, #5]	@ zero_extendqisi2
+ 286              	.LVL29:
+ 287 01d4 0200D405 		ldreqb	r0, [r4, #2]	@ zero_extendqisi2
+ 288 01d8 01148301 		orreq	r1, r3, r1, asl #8
+ 289 01dc FEFFFF0B 		bleq	USBHwEPConfig
+ 290              	.LVL30:
+ 291              	.L40:
+ 292              		.loc 1 207 0
+ 293 01e0 0030D4E5 		ldrb	r3, [r4, #0]	@ zero_extendqisi2
+ 294 01e4 034084E0 		add	r4, r4, r3
+ 295              	.L38:
+ 296              		.loc 1 177 0
+ 297 01e8 0030D4E5 		ldrb	r3, [r4, #0]	@ zero_extendqisi2
+ 298 01ec 000053E3 		cmp	r3, #0
+ 299 01f0 6600001A 		bne	.L39
+ 300              	.LVL31:
+ 301              		.loc 1 211 0
+ 302 01f4 0100A0E3 		mov	r0, #1
+ 303              	.LVL32:
+ 304              	.L56:
+ 305 01f8 FEFFFFEB 		bl	USBHwConfigDevice
+ 306              	.LVL33:
+ 307              	.LBE7:
+ 308              	.LBE6:
+ 309              		.loc 1 261 0
+ 310 01fc B220D5E1 		ldrh	r2, [r5, #2]
+ 311 0200 FC309FE5 		ldr	r3, .L60+4
+ 312 0204 01C0A0E3 		mov	ip, #1
+ 313 0208 0020C3E5 		strb	r2, [r3, #0]
+ 314 020c BB0000EA 		b	.L24
+ 315              	.LVL34:
+ 316              	.L27:
+ 317              	.LBE5:
+ 318              	.LBE4:
+ 319              	.LBB8:
+ 320              	.LBB9:
+ 321              		.loc 1 300 0
+ 322 0210 0130D5E5 		ldrb	r3, [r5, #1]	@ zero_extendqisi2
+ 323 0214 000053E3 		cmp	r3, #0
+ 324              		.loc 1 298 0
+ 325 0218 002097E5 		ldr	r2, [r7, #0]
+ 326              	.LVL35:
+ 327              		.loc 1 300 0
+ 328 021c 8B00000A 		beq	.L46
+ 329 0220 0A0053E3 		cmp	r3, #10
+ 330 0224 9000000A 		beq	.L47
+ 331 0228 0B0053E3 		cmp	r3, #11
+ 332 022c BA00001A 		bne	.L25
+ 333 0230 940000EA 		b	.L48
+ 334              	.L46:
+ 335              		.loc 1 305 0
+ 336 0234 0130C2E5 		strb	r3, [r2, #1]
+ 337              		.loc 1 304 0
+ 338 0238 0030C2E5 		strb	r3, [r2, #0]
+ 339              		.loc 1 306 0
+ 340 023c 04C0A0E1 		mov	ip, r4
+ 341 0240 0230A0E3 		mov	r3, #2
+ 342 0244 5B0000EA 		b	.L58
+ 343              	.L47:
+ 344              		.loc 1 316 0
+ 345 0248 0030A0E3 		mov	r3, #0
+ 346              		.loc 1 317 0
+ 347 024c 04C0A0E1 		mov	ip, r4
+ 348              		.loc 1 316 0
+ 349 0250 0030C2E5 		strb	r3, [r2, #0]
+ 350 0254 AA0000EA 		b	.L59
+ 351              	.L48:
+ 352              		.loc 1 322 0
+ 353 0258 B200D5E1 		ldrh	r0, [r5, #2]
+ 354 025c 000050E3 		cmp	r0, #0
+ 355              		.loc 1 325 0
+ 356 0260 01C0A003 		moveq	ip, #1
+ 357 0264 00008805 		streq	r0, [r8, #0]
+ 358              		.loc 1 322 0
+ 359 0268 BB00000A 		beq	.L24
+ 360 026c BA0000EA 		b	.L25
+ 361              	.LVL36:
+ 362              	.L28:
+ 363              	.LBE9:
+ 364              	.LBE8:
+ 365              	.LBB10:
+ 366              	.LBB11:
+ 367              		.loc 1 350 0
+ 368 0270 0160D5E5 		ldrb	r6, [r5, #1]	@ zero_extendqisi2
+ 369 0274 010056E3 		cmp	r6, #1
+ 370              		.loc 1 348 0
+ 371 0278 007097E5 		ldr	r7, [r7, #0]
+ 372              	.LVL37:
+ 373              		.loc 1 350 0
+ 374 027c AC00000A 		beq	.L51
+ 375 0280 A200003A 		bcc	.L50
+ 376 0284 030056E3 		cmp	r6, #3
+ 377 0288 BA00001A 		bne	.L25
+ 378 028c B30000EA 		b	.L52
+ 379              	.L50:
+ 380              		.loc 1 353 0
+ 381 0290 0400D5E5 		ldrb	r0, [r5, #4]	@ zero_extendqisi2
+ 382 0294 FEFFFFEB 		bl	USBHwEPGetStatus
+ 383              	.LVL38:
+ 384 0298 A000A0E1 		mov	r0, r0, lsr #1
+ 385 029c 010000E2 		and	r0, r0, #1
+ 386              		.loc 1 354 0
+ 387 02a0 0030A0E3 		mov	r3, #0
+ 388 02a4 0130C7E5 		strb	r3, [r7, #1]
+ 389              		.loc 1 353 0
+ 390 02a8 0000C7E5 		strb	r0, [r7, #0]
+ 391              		.loc 1 355 0
+ 392 02ac 01C0A0E3 		mov	ip, #1
+ 393              	.LVL39:
+ 394              	.L59:
+ 395 02b0 004088E5 		str	r4, [r8, #0]
+ 396 02b4 BB0000EA 		b	.L24
+ 397              	.LVL40:
+ 398              	.L51:
+ 399              		.loc 1 359 0
+ 400 02b8 B210D5E1 		ldrh	r1, [r5, #2]
+ 401 02bc 000051E3 		cmp	r1, #0
+ 402 02c0 BA00001A 		bne	.L25
+ 403              		.loc 1 361 0
+ 404 02c4 0400D5E5 		ldrb	r0, [r5, #4]	@ zero_extendqisi2
+ 405 02c8 FEFFFFEB 		bl	USBHwEPStall
+ 406              	.LVL41:
+ 407 02cc 06C0A0E1 		mov	ip, r6
+ 408 02d0 BB0000EA 		b	.L24
+ 409              	.LVL42:
+ 410              	.L52:
+ 411              		.loc 1 368 0
+ 412 02d4 B230D5E1 		ldrh	r3, [r5, #2]
+ 413 02d8 000053E3 		cmp	r3, #0
+ 414 02dc BA00001A 		bne	.L25
+ 415              		.loc 1 370 0
+ 416 02e0 0400D5E5 		ldrb	r0, [r5, #4]	@ zero_extendqisi2
+ 417 02e4 0110A0E3 		mov	r1, #1
+ 418 02e8 FEFFFFEB 		bl	USBHwEPStall
+ 419              	.LVL43:
+ 420 02ec 4E0000EA 		b	.L57
+ 421              	.LVL44:
+ 422              	.L25:
+ 423              		.loc 1 371 0
+ 424 02f0 00C0A0E3 		mov	ip, #0
+ 425              	.LVL45:
+ 426              	.L24:
+ 427              	.LBE11:
+ 428              	.LBE10:
+ 429              		.loc 1 413 0
+ 430 02f4 0C00A0E1 		mov	r0, ip
+ 431 02f8 F041BDE8 		ldmfd	sp!, {r4, r5, r6, r7, r8, lr}
+ 432 02fc 1EFF2FE1 		bx	lr
+ 433              	.L61:
+ 434              		.align	2
+ 435              	.L60:
+ 436 0300 00000000 		.word	pfnHandleCustomReq
+ 437 0304 04000000 		.word	bConfiguration
+ 438 0308 08000000 		.word	pabDescrip
+ 439              	.LFE8:
+ 441              		.align	2
+ 442              		.global	USBRegisterCustomReqHandler
+ 444              	USBRegisterCustomReqHandler:
+ 445              	.LFB9:
+ 414:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 415:../Bootloader/LPCUSB/usbstdreq.c **** 
+ 416:../Bootloader/LPCUSB/usbstdreq.c **** /**
+ 417:../Bootloader/LPCUSB/usbstdreq.c **** 	Registers a callback for custom device requests
+ 418:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 419:../Bootloader/LPCUSB/usbstdreq.c **** 	In USBHandleStandardRequest, the custom request handler gets a first
+ 420:../Bootloader/LPCUSB/usbstdreq.c **** 	chance at handling the request before it is handed over to the 'chapter 9'
+ 421:../Bootloader/LPCUSB/usbstdreq.c **** 	request handler.
+ 422:../Bootloader/LPCUSB/usbstdreq.c **** 	
+ 423:../Bootloader/LPCUSB/usbstdreq.c **** 	This can be used for example in HID devices, where a REQ_GET_DESCRIPTOR
+ 424:../Bootloader/LPCUSB/usbstdreq.c **** 	request is sent to an interface, which is not covered by the 'chapter 9'
+ 425:../Bootloader/LPCUSB/usbstdreq.c **** 	specification.
+ 426:../Bootloader/LPCUSB/usbstdreq.c **** 		
+ 427:../Bootloader/LPCUSB/usbstdreq.c **** 	@param [in]	pfnHandler	Callback function pointer
+ 428:../Bootloader/LPCUSB/usbstdreq.c ****  */
+ 429:../Bootloader/LPCUSB/usbstdreq.c **** void USBRegisterCustomReqHandler(TFnHandleRequest *pfnHandler)
+ 430:../Bootloader/LPCUSB/usbstdreq.c **** {
+ 446              		.loc 1 430 0
+ 447              		@ Function supports interworking.
+ 448              		@ args = 0, pretend = 0, frame = 0
+ 449              		@ frame_needed = 0, uses_anonymous_args = 0
+ 450              		@ link register save eliminated.
+ 451              	.LVL46:
+ 431:../Bootloader/LPCUSB/usbstdreq.c **** 	pfnHandleCustomReq = pfnHandler;
+ 452              		.loc 1 431 0
+ 453 030c 04309FE5 		ldr	r3, .L64
+ 454              		.loc 1 430 0
+ 455              		@ lr needed for prologue
+ 456              		.loc 1 431 0
+ 457 0310 000083E5 		str	r0, [r3, #0]
+ 432:../Bootloader/LPCUSB/usbstdreq.c **** }
+ 458              		.loc 1 432 0
+ 459 0314 1EFF2FE1 		bx	lr
+ 460              	.L65:
+ 461              		.align	2
+ 462              	.L64:
+ 463 0318 00000000 		.word	pfnHandleCustomReq
+ 464              	.LFE9:
+ 543              	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 usbstdreq.c
+                             .bss:0000000000000000 $d
+     /tmp/ccSB6btS.s:12     .bss:0000000000000000 pfnHandleCustomReq
+     /tmp/ccSB6btS.s:14     .bss:0000000000000004 bConfiguration
+     /tmp/ccSB6btS.s:17     .bss:0000000000000008 pabDescrip
+     /tmp/ccSB6btS.s:23     .text:0000000000000000 USBRegisterDescriptors
+     /tmp/ccSB6btS.s:33     .text:0000000000000000 $a
+     /tmp/ccSB6btS.s:43     .text:000000000000000c $d
+     /tmp/ccSB6btS.s:49     .text:0000000000000010 USBGetDescriptor
+     /tmp/ccSB6btS.s:56     .text:0000000000000010 $a
+     /tmp/ccSB6btS.s:127    .text:0000000000000090 $d
+     /tmp/ccSB6btS.s:133    .text:0000000000000094 USBHandleStandardRequest
+     /tmp/ccSB6btS.s:140    .text:0000000000000094 $a
+     /tmp/ccSB6btS.s:181    .text:00000000000000f8 $d
+     /tmp/ccSB6btS.s:193    .text:0000000000000120 $a
+     /tmp/ccSB6btS.s:436    .text:0000000000000300 $d
+     /tmp/ccSB6btS.s:444    .text:000000000000030c USBRegisterCustomReqHandler
+     /tmp/ccSB6btS.s:453    .text:000000000000030c $a
+     /tmp/ccSB6btS.s:463    .text:0000000000000318 $d
+
+UNDEFINED SYMBOLS
+USBHwSetAddress
+USBHwEPConfig
+USBHwConfigDevice
+USBHwEPGetStatus
+USBHwEPStall
