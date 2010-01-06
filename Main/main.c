@@ -36,23 +36,46 @@ static void timer0ISR(void);
 static void timer1ISR(void);
 
 
-// time to start from scratch
+/****************************************
+ *          INTERNAL VARS               *
+ ****************************************/
+char green = 0x1C;          // 8 bit color
 
-/*
-first function referenced in the now broken build is delay_ms
-so the first function I will define is delay_ms.
-the clock is at 12 MHz, multiplied by 5 to get 60 MHz for the
-microprocessor speed. This means an instruction may be executed
-every 1x1e-8 seconds. To get a millisecond delay, we multiply by
-1000. So we get an instruction every 1x1e-6 milliseconds. This
-means that to delay for a millisecond, we need to execute 1000000
-nops in that time.
-*/
+/****************************************
+ *          EXTERNAL VARS               *
+ ****************************************/
+extern char black;          // from LCD_driver
+
+
+int main(void) {
+    /*****************
+     * boot sequence *
+     *****************/
+    
+    bootARM();           // ARM boot sequence
+    vs1002Config();                 //Configure MP3 I/O
+    vs1002Reset();                  //Reset MP3 Player
+    vs1002Init();
+
+    // start of code
+    ledRedOn();         // red LED indicates powering up
+    LCDInit();          // initialize LCD
+    LCDClear(black);   
+
+    return 0;
+}
+
+
+// time to start from scratch
 
 /*
  * function: void delay_ms(int count)
  *      input: the number of milliseconds to delay for
  *      output: no output but the system will pause for n milliseconds
+ *
+ *      the value of 1000000 is derived from the clock speed of the ARM:
+ *      60 MHz = 1 instruction / 1e-8 seconds; so 1e6 nops will take one
+ *      millisecond to execute.
  */
 
 void delay_ms(int count) {
@@ -74,11 +97,12 @@ void reset(void) {
     WDFEED = 0x00;
 }
 
-/****************************************
- *          INTERNAL VARS               *
- ****************************************/
 
-/****************************************
- *          EXTERNAL VARS               *
- ****************************************/
+// intialization functions
+void bootARM(void) {
+    delay_ms(30);       // wait for power to stabilize
 
+
+    // set up MP3 decoder
+    
+}
