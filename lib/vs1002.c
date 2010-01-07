@@ -167,12 +167,13 @@ void vs1002SendMusic(unsigned char* songData, int buffer_size){
 	UNSELECT_MP3_SDI();
 }
 
-//Usage: vs1002Reset();
-//Inputs: None
-//Outputs: None
-//Description: Resets the mp3 player
-void vs1002Reset(void){
-	//Reset the MP3 Player and make sure the mp3 player doesn't try to boot from SPI
+// Usage: vs1002Reset();
+// Inputs: None
+// Outputs: None
+// Description: (Hardware) reset the mp3 player
+void vs1002Reset(void) {
+	// Reset the MP3 Player and make sure the mp3 player doesn't try to 
+	// boot from SPI
 	IOCLR0 = MP3_GPIO0;		//Pull GPIO0 low
 	IOCLR1 = MP3_XRES;		//Reset the vs1002
 	delay_ms(10);			//Hold Reset

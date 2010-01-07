@@ -1,6 +1,6 @@
 void delay_ms(int count);
 //*******************************************************
-//					GPIO Definitions
+//			GPIO Definitions
 //*******************************************************
 //PORT 0 DEFINITIONS
 #define LCD_SCK		0x00000010		// Define P0.4 (Used when not in SPI Mode)
@@ -34,7 +34,7 @@ void delay_ms(int count);
 #define FM_CS		0x10000000		// Define P1.28
 
 //*******************************************************
-//				Special Function Pin Definitions
+//		Special Function Pin Definitions
 //*******************************************************
 #define MMA_X_PINSEL    0x03000000	// Select ADC Function for P0.12
 #define MMA_Y_PINSEL    0x0C000000	// Select ADC Function for P0.13
@@ -46,13 +46,13 @@ void delay_ms(int count);
 #define MOSI_PINSEL	0x00001000	// Select SPI Function for P0.6
 
 //*******************************************************
-//					General Definitions
+//			General Definitions
 //*******************************************************
 #define X_CHANNEL	0x00000008	// Select AD1.3
 #define Y_CHANNEL	0x00000010	// Select AD1.4
 #define Z_CHANNEL	0x00000020	// Select AD1.5
 
-//Menus
+// Menus
 #define	VOLUMEMENU		1
 #define	RADIOPMENU		2
 #define	RADIOCMENU		3
@@ -75,7 +75,7 @@ void delay_ms(int count);
 #define NO_BUT                  0
 
 //*******************************************************
-//					Global Macros
+//		Global Macros
 //*******************************************************
 #define ledBlueOff()	IOSET0 = LED_BLU
 #define ledBlueOn()	IOCLR0 = LED_BLU
