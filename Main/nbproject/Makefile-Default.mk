@@ -12,14 +12,14 @@ MKDIR=mkdir
 CP=cp
 CCADMIN=CCadmin
 RANLIB=ranlib
-CC=gcc
-CCC=g++
-CXX=g++
+CC=arm-elf-gcc.exe
+CCC=arm-elf-g++.exe
+CXX=arm-elf-g++.exe
 FC=
-AS=as
+AS=arm-elf-as.exe
 
 # Macros
-CND_PLATFORM=GNU-Linux-x86
+CND_PLATFORM=GNUARM-Windows
 CND_CONF=Default
 CND_DISTDIR=dist
 

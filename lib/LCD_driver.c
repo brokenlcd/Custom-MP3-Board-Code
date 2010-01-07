@@ -6,7 +6,7 @@
 #include "LCD_driver.h"
 #include "LPC214x.h"
 #include "stdlib.h"
-#include "MP3Dev.h"
+#include "../MP3Dev.h"
 #include "rprintf.h"
 
 //********************************************************************
@@ -29,7 +29,6 @@ static char y_offset = 0;
 	char white = 0xFF;//white teXt
 	char red = 0xC0;
 	char black = 0x00;//black background
-        char green = 0x1C; // green text
 #endif
 #ifdef	PHILLIPS
 	char white = 0x00;

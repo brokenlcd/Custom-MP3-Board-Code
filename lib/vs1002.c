@@ -23,9 +23,9 @@
                   Header files
  **********************************************************/
 #include "LPC214x.h"		//Common LPC2148 definitions
-#include "spi0.h"			//SPI port 0 communication
-#include "MP3Dev.h"			//Defines SONG_BYTES_BUFFERED
-#include "vs1002.h"			//Contains Registers/Bit Masks for vs1002
+#include "spi0.h"		//SPI port 0 communication
+#include "../Main/MP3Dev.h"	//Defines SONG_BYTES_BUFFERED
+#include "vs1002.h"		//Contains Registers/Bit Masks for vs1002
 #include "rprintf.h"
 #include "serial.h"
 
@@ -50,7 +50,9 @@ void vs1002Init(void){
 void vs1002Config(void){
 	
 	//Setup I/O Ports
-	PINSEL0	|= (SCLK_PINSEL | MISO_PINSEL | MOSI_PINSEL);	// SPI pin connections
+
+        // SPI pin connections
+	PINSEL0	|= (SCLK_PINSEL | MISO_PINSEL | MOSI_PINSEL);	
 	PINSEL0 &= 0x0FFFFF0F;									
 	
 }

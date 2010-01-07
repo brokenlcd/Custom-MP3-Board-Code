@@ -104,5 +104,9 @@ void bootARM(void) {
 
 
     // set up MP3 decoder
+    vs1002Reset();
+    vs1002Init();
+    vs1002Config();
+    
     
 }

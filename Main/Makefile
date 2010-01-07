@@ -251,18 +251,18 @@ LPC21ISP_CONTROL = -control
 
 
 # Define directories, if needed.
-DIRARM = /home/kisom/gcc-arm
+DIRARM = c:/gnuarm
 DIRARMBIN = $(DIRARM)/bin
 DIRAVRUTILS = $(DIRARM)/utils/bin/
 
 # Define programs and commands.
 SHELL = sh
-CC = $(DIRARMBIN)/arm-elf-gcc
-CPP = $(DIRARMBIN)/arm-elf-g++
-OBJCOPY = $(DIRARMBIN)/arm-elf-objcopy
-OBJDUMP = $(DIRARMBIN)/arm-elf-objdump
-SIZE = $(DIRARMBIN)/arm-elf-size
-NM = $(DIRARMBIN)/arm-elf-nm
+CC = $(DIRARMBIN)/arm-elf-gcc.exe
+CPP = $(DIRARMBIN)/arm-elf-g++.exe
+OBJCOPY = $(DIRARMBIN)/arm-elf-objcopy.exe
+OBJDUMP = $(DIRARMBIN)/arm-elf-objdump.exe
+SIZE = $(DIRARMBIN)/arm-elf-size.exe
+NM = $(DIRARMBIN)/arm-elf-nm.exe
 REMOVE = rm -f
 COPY = cp
 
