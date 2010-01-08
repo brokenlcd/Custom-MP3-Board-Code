@@ -31,9 +31,9 @@
 //*******************************************************
 //					Interrupt Functions
 //*******************************************************
-
 static void timer0ISR(void);
-static void timer1ISR(void);
+static void timer1ISR(void); 
+
 
 
 /****************************************
@@ -53,9 +53,7 @@ int main(void) {
      *****************/
     
     bootARM();           	// ARM boot sequence
-    vs1002Config();             //Configure MP3 I/O
-    vs1002Reset();              //Reset MP3 Player
-    vs1002Init();
+    vs1002Mute();           // mute volume during start up
 
     // start of code
     ledRedOn();         // red LED indicates powering up
@@ -73,7 +71,7 @@ int main(void) {
  *      input: the number of milliseconds to delay for
  *      output: no output but the system will pause for n milliseconds
  *
- *      the value of 1000000 is derived from the clock speed of the ARM:
+ *      the value of count is derived from the clock speed of the ARM:
  *      60 MHz = 1 instruction / 1.7e-8 seconds; so 1e6 nops will take one
  *      millisecond to execute.
  */
@@ -183,3 +181,6 @@ void bootARM(void) {
     return;
     
 }
+
+void timer0ISR(void) { return; }
+void timer1ISR(void) { return; } 
